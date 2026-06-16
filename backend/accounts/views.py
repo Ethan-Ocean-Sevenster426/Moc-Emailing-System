@@ -243,25 +243,35 @@ def _optout_url(contact_id):
     return f'{base}/api/optout/{_optout_token(contact_id)}/'
 
 
-def _apply_opt_out(html, opt_out_text, contact_id, is_html=True):
-    """Insert the opt-out line into an email body.
+def _text_to_html(text):
+    """Convert a plain-text email body to simple HTML, preserving line breaks."""
+    safe = escape(text or '').replace('\n', '<br>')
+    return f'<div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;line-height:1.6">{safe}</div>'
 
-    If the body contains the {{opt_out}} marker, it's replaced inline with the
-    clickable opt-out sentence; otherwise the line is appended as a footer.
+
+def _apply_opt_out(html, opt_out_text, contact_id, is_html=True):
+    """Append/insert the opt-out line as a clickable HTML link.
+
+    The word "here" in the sentence becomes the link (so it reads naturally);
+    if there's no "here", the whole sentence is linked. Replaces the {{opt_out}}
+    marker inline when present, otherwise appends a footer.
     """
     text = (opt_out_text or '').strip() or DEFAULT_OPT_OUT_TEXT
     url = _optout_url(contact_id)
-    if is_html:
-        link = f'<a href="{url}" style="color:#054B70">{escape(text)}</a>'
-        footer = f'<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">{link}</div>'
-        if '{{opt_out}}' in html:
-            return html.replace('{{opt_out}}', link)
-        return html + footer
+    safe = escape(text)
+    if re.search(r'(?i)\bhere\b', safe):
+        # Link the last occurrence of the word "here", preserving its original case.
+        linked = re.sub(
+            r'(?i)\bhere\b(?![\s\S]*\bhere\b)',
+            lambda m: f'<a href="{url}" style="color:#054B70">{m.group(0)}</a>',
+            safe,
+        )
     else:
-        line = f'{text}\n{url}'
-        if '{{opt_out}}' in html:
-            return html.replace('{{opt_out}}', line)
-        return html + '\n\n' + line
+        linked = f'<a href="{url}" style="color:#054B70">{safe}</a>'
+    footer = f'<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">{linked}</div>'
+    if '{{opt_out}}' in html:
+        return html.replace('{{opt_out}}', linked)
+    return html + footer
 
 
 # ── OTP email helper ─────────────────────────────────────────────────────────
@@ -1007,15 +1017,14 @@ def send_test_email(request):
     except TouchpointTemplate.DoesNotExist:
         return JsonResponse({'ok': False, 'error': f'Template for TP{tp_num} not found. Save the template first.'}, status=404)
 
-    # Determine email body
+    # Determine email body — always sent as HTML so links (opt-out) are clickable
     if tpl.body_html:
         body_content = tpl.body_html
-        content_type = 'HTML'
     else:
-        body_content = tpl.body
+        body_content = _text_to_html(tpl.body)
         if tpl.signature:
-            body_content += '\n\n' + tpl.signature
-        content_type = 'Text'
+            body_content += f'<div style="margin-top:12px;white-space:pre-wrap">{escape(tpl.signature)}</div>'
+    content_type = 'HTML'
 
     # Inline signature image
     sig_inline = None
@@ -1671,17 +1680,16 @@ def templates_library_send_test(request):
     if not tpl:
         return JsonResponse({'ok': False, 'error': 'Template not found'}, status=404)
 
-    # Build content
+    # Build content — always HTML so links (opt-out) are clickable
     if tpl.body_html:
         body_content = tpl.body_html
-        content_type = 'HTML'
         if tpl.signature:
             body_content += f'<div style="margin-top:12px;white-space:pre-wrap">{tpl.signature}</div>'
     else:
-        body_content = tpl.body
+        body_content = _text_to_html(tpl.body)
         if tpl.signature:
-            body_content += '\n\n' + tpl.signature
-        content_type = 'Text'
+            body_content += f'<div style="margin-top:12px;white-space:pre-wrap">{escape(tpl.signature)}</div>'
+    content_type = 'HTML'
 
     # Inline signature image
     sig_inline = None
@@ -1975,18 +1983,17 @@ def _run_bulk_send(job_id):
     src_signature = lib.signature if lib else tpl.signature
     src_opt_out_text = (lib.opt_out_text if lib else tpl.opt_out_text) or DEFAULT_OPT_OUT_TEXT
 
-    # Prepare email content (same logic as send_test_email)
+    # Prepare email content — always HTML so links (opt-out) are clickable
     if src_body_html:
         body_content = src_body_html
-        content_type = 'HTML'
-        # Library templates carry a dedicated signature field — append it in HTML mode.
+        # Library templates carry a dedicated signature field — append it.
         if lib and src_signature:
             body_content += f'<div style="margin-top:12px;white-space:pre-wrap">{src_signature}</div>'
     else:
-        body_content = src_body
+        body_content = _text_to_html(src_body)
         if src_signature:
-            body_content += '\n\n' + src_signature
-        content_type = 'Text'
+            body_content += f'<div style="margin-top:12px;white-space:pre-wrap">{escape(src_signature)}</div>'
+    content_type = 'HTML'
 
     # Signature image + attachment come from the chosen template when present, else the touchpoint.
     src_signature_image = lib.signature_image if lib else tpl.signature_image

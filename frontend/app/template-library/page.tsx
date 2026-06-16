@@ -211,9 +211,12 @@ export default function TemplateLibraryPage() {
       html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
     }
     if (form.signature) html += `<div style="margin-top:12px;white-space:pre-wrap">${form.signature}</div>`;
-    // Opt-out line — styled, non-clickable in preview
+    // Opt-out line — underline the word "here" (non-clickable in preview), matching the email
     const optText = (form.opt_out_text ?? "").trim() || DEFAULT_OPT_OUT_TEXT;
-    const optLink = `<span style="color:#054B70;text-decoration:underline">${optText}</span>`;
+    const optStyle = "color:#054B70;text-decoration:underline";
+    const optLink = /here/i.test(optText)
+      ? optText.replace(/(here)(?![\s\S]*here)/i, `<span style="${optStyle}">$1</span>`)
+      : `<span style="${optStyle}">${optText}</span>`;
     if (html.includes("{{opt_out}}")) html = html.split("{{opt_out}}").join(optLink);
     else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
     return `<base target="_blank"><div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;padding:4px">${html}</div>`;
