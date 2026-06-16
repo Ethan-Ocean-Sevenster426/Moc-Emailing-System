@@ -7,7 +7,7 @@ import MainContent from "../components/MainContent";
 import MobileMenuButton from "../components/MobileMenuButton";
 import { useAuth } from "../hooks/useAuth";
 
-const API = "http://localhost:8000/api";
+const API = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
 interface Template {
   touchpoint_number: number;
@@ -187,7 +187,7 @@ export default function EmailTemplatesPage() {
     }
 
     // 2. Replace signature image references so they render in the preview
-    const sigUrl = sigPreviewUrl || (current.signature_image_url ? `http://localhost:8000${current.signature_image_url}` : "");
+    const sigUrl = sigPreviewUrl || (current.signature_image_url ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${current.signature_image_url}` : "");
     if (sigUrl) {
       const hasDriveUrl = /https:\/\/drive\.google\.com\/thumbnail\?id=/i.test(html);
       const hasCidRef = /cid:signature_tp\d+/i.test(html);
@@ -971,7 +971,7 @@ export default function EmailTemplatesPage() {
                     ) : (
                       <div className="flex items-center gap-3 rounded-xl border border-[#054B70]/15 bg-[#054B70]/5 px-3 py-3 animate-scale-in">
                         {(sigPreviewUrl || current.signature_image_url) && (
-                          <img src={sigPreviewUrl || `http://localhost:8000${current.signature_image_url}`} alt="Signature" className="h-10 w-auto rounded-lg border border-[#d0dce4] bg-white object-contain" />
+                          <img src={sigPreviewUrl || `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${current.signature_image_url}`} alt="Signature" className="h-10 w-auto rounded-lg border border-[#d0dce4] bg-white object-contain" />
                         )}
                         <span className="flex-1 truncate text-[12px] font-medium text-[#0a2a3c]">
                           {pendingSigImg?.name || current.signature_image_name}

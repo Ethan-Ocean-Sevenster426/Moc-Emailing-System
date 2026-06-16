@@ -6,7 +6,7 @@ import MainContent from "../components/MainContent";
 import MobileMenuButton from "../components/MobileMenuButton";
 import { useAuth } from "../hooks/useAuth";
 
-const API = "http://localhost:8000/api";
+const API = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
 interface Overview {
   total_jobs: number;

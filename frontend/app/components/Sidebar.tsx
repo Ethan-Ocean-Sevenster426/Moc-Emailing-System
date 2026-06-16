@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
 
-const API = "http://localhost:8000/api";
+const API = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
 const NAV_ITEMS = [
   {

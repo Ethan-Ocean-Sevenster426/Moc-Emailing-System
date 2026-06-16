@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-const API = "http://localhost:8000/api";
+const API = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
 function SetPasswordForm() {
   const searchParams = useSearchParams();

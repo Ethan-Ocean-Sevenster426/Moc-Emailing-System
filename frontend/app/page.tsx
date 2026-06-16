@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-const API = "http://localhost:8000/api";
+const API = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
 export default function LoginPage() {
   const [step, setStep] = useState<"credentials" | "forgot">("credentials");

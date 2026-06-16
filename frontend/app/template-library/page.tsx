@@ -6,8 +6,8 @@ import MainContent from "../components/MainContent";
 import MobileMenuButton from "../components/MobileMenuButton";
 import { useAuth } from "../hooks/useAuth";
 
-const API = "http://localhost:8000/api";
-const BACKEND = "http://localhost:8000";
+const API = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface LibraryTemplate {
   id: number;
