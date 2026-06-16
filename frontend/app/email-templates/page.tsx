@@ -168,61 +168,66 @@ export default function EmailTemplatesPage() {
     } catch { /* */ }
   }
 
-  // Build preview HTML that matches what the recipient actually receives
+  const SAMPLE_VARS: Record<string, string> = useMemo(() => ({
+    "{{org_name}}": "Sample Corp Inc.",
+    "{{contact_name}}": "John Doe",
+    "{{email}}": "johndoe@samplecorp.com",
+    "{{phone}}": "+1 (555) 123-4567",
+    "{{touchpoint_number}}": String(activeTP || 1),
+  }), [activeTP]);
+
+  const fillVars = useCallback((s: string) => {
+    let out = s;
+    for (const [k, v] of Object.entries(SAMPLE_VARS)) out = out.split(k).join(v);
+    return out;
+  }, [SAMPLE_VARS]);
+
+  // Subject as the recipient sees it (sample data filled in)
+  const previewSubject = useMemo(() => (current ? fillVars(current.subject) : ""), [current, fillVars]);
+
+  // Build preview HTML that matches what the recipient actually receives.
+  // Uses the HTML body if present, otherwise renders the plain-text body.
   const previewHtml = useMemo(() => {
-    if (!current || !current.body_html.trim()) return "";
+    if (!current) return "";
+    const hasHtml = current.body_html.trim();
+    const hasText = current.body.trim();
+    if (!hasHtml && !hasText) return "";
 
-    let html = current.body_html;
+    let html: string;
+    if (hasHtml) {
+      html = current.body_html;
+    } else {
+      // Plain-text email: mirror the backend (append signature text), preserve line breaks
+      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      let text = current.body;
+      if (current.signature.trim()) text += "\n\n" + current.signature;
+      html = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;white-space:pre-wrap">${esc(text)}</div>`;
+    }
 
-    // 1. Substitute template variables with sample values (same as backend)
-    const sampleVars: Record<string, string> = {
-      "{{org_name}}": "Sample Corp Inc.",
-      "{{contact_name}}": "John Doe",
-      "{{email}}": "johndoe@samplecorp.com",
-      "{{phone}}": "+1 (555) 123-4567",
-      "{{touchpoint_number}}": String(activeTP || 1),
-    };
-    for (const [key, val] of Object.entries(sampleVars)) {
+    for (const [key, val] of Object.entries(SAMPLE_VARS)) {
       html = html.split(key).join(val);
     }
 
-    // 2. Replace signature image references so they render in the preview
-    const sigUrl = sigPreviewUrl || (current.signature_image_url ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${current.signature_image_url}` : "");
-    if (sigUrl) {
-      const hasDriveUrl = /https:\/\/drive\.google\.com\/thumbnail\?id=/i.test(html);
-      const hasCidRef = /cid:signature_tp\d+/i.test(html);
-
-      if (hasDriveUrl) {
-        // Replace Google Drive thumbnail URLs (same regex as backend)
-        html = html.replace(
-          /https:\/\/drive\.google\.com\/thumbnail\?id=[^"'&]+(?:&amp;[^"']*|&[^"']*)*/gi,
-          sigUrl
-        );
-      }
-      if (hasCidRef) {
-        // Replace cid:signature_tp{N} references
-        html = html.replace(
-          /cid:signature_tp\d+/gi,
-          sigUrl
-        );
-      }
-      // If neither reference exists, append the signature image at the end
-      if (!hasDriveUrl && !hasCidRef) {
-        html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
+    // Signature image only applies to HTML emails
+    if (hasHtml) {
+      const sigUrl = sigPreviewUrl || (current.signature_image_url ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${current.signature_image_url}` : "");
+      if (sigUrl) {
+        const hasDriveUrl = /https:\/\/drive\.google\.com\/thumbnail\?id=/i.test(html);
+        const hasCidRef = /cid:signature_tp\d+/i.test(html);
+        if (hasDriveUrl) html = html.replace(/https:\/\/drive\.google\.com\/thumbnail\?id=[^"'&]+(?:&amp;[^"']*|&[^"']*)*/gi, sigUrl);
+        if (hasCidRef) html = html.replace(/cid:signature_tp\d+/gi, sigUrl);
+        if (!hasDriveUrl && !hasCidRef) html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
       }
     }
 
-    // 3. Render the opt-out line as it will appear (a link; not clickable in preview)
+    // Opt-out line (a link; not clickable in preview)
     const optText = (current.opt_out_text ?? "").trim() || DEFAULT_OPT_OUT_TEXT;
     const optLink = `<a href="#" style="color:#054B70">${optText}</a>`;
-    if (html.includes("{{opt_out}}")) {
-      html = html.split("{{opt_out}}").join(optLink);
-    } else {
-      html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
-    }
+    if (html.includes("{{opt_out}}")) html = html.split("{{opt_out}}").join(optLink);
+    else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
 
     return html;
-  }, [current, activeTP, sigPreviewUrl]);
+  }, [current, sigPreviewUrl, SAMPLE_VARS]);
 
   useEffect(() => {
     Promise.all([
@@ -915,26 +920,31 @@ export default function EmailTemplatesPage() {
                       Email Preview
                       <span className="font-normal normal-case text-[#c0d0d8]">— as recipient sees it</span>
                     </label>
-                    <div className="rounded-xl border border-[#d0dce4] bg-[#f7f9fb] p-1">
+                    <div className="overflow-hidden rounded-xl border border-[#d0dce4] bg-[#f7f9fb]">
                       <div className="flex items-center gap-1.5 px-3 py-2">
                         <div className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
                         <div className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
                         <div className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
                         <span className="ml-2 text-[10px] text-[#8ca3b3]">Preview — sample data</span>
                       </div>
+                      {/* Subject header */}
+                      <div className="border-y border-[#e8eff3] bg-white px-4 py-2.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-[#b0c4d0]">Subject</span>
+                        <p className="text-[13px] font-semibold text-[#0a2a3c]">{previewSubject || "(No subject)"}</p>
+                      </div>
                       {previewHtml ? (
                         <iframe
                           srcDoc={previewHtml}
-                          className="w-full rounded-lg border-0 bg-white"
-                          style={{ minHeight: 300 }}
+                          className="w-full border-0 bg-white"
+                          style={{ minHeight: 280 }}
                           sandbox="allow-same-origin"
                           title="Email preview"
                         />
                       ) : (
-                        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg bg-white px-6 text-center">
+                        <div className="flex min-h-[280px] flex-col items-center justify-center bg-white px-6 text-center">
                           <svg className="mb-2 h-8 w-8 text-[#d0dce4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                          <p className="text-[12px] font-medium text-[#8ca3b3]">Nothing to preview yet</p>
-                          <p className="mt-0.5 text-[11px] text-[#b0c4d0]">Add content to the HTML Body to see it here.</p>
+                          <p className="text-[12px] font-medium text-[#8ca3b3]">No body content yet</p>
+                          <p className="mt-0.5 text-[11px] text-[#b0c4d0]">Type into the HTML Body or Plain Text Body to see it here.</p>
                         </div>
                       )}
                     </div>
