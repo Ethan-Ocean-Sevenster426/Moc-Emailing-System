@@ -17,24 +17,36 @@ A B2B cold-outreach email platform built on **AWS SES**, with a Django REST back
 
 | Layer | Stack |
 |-------|-------|
-| Backend | Django, SQLite (dev), AWS SES via boto3 |
+| Backend | Django, **MySQL**, AWS SES via boto3 |
 | Frontend | Next.js (App Router), React, Tailwind CSS, TypeScript |
 
 ## Local setup
 
-### 1. Backend
+### 1. Database (MySQL)
 
-```bash
-cd backend
-python -m venv .venv && .venv/Scripts/activate    # Windows
-pip install -r requirements.txt                    # or: django boto3 python-dotenv dnspython
-cp .env.example .env                               # then fill in real AWS SES values
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver                         # http://localhost:8000
+```sql
+CREATE DATABASE moc_emailing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'moc'@'localhost' IDENTIFIED BY 'your-mysql-password';
+GRANT ALL PRIVILEGES ON moc_emailing.* TO 'moc'@'localhost';
+FLUSH PRIVILEGES;
 ```
 
-### 2. Frontend
+### 2. Backend
+
+```bash
+# Ubuntu build deps for mysqlclient:
+sudo apt install -y python3-venv build-essential pkg-config default-libmysqlclient-dev
+
+cd backend
+python3 -m venv .venv && source .venv/bin/activate   # Linux
+pip install -r requirements.txt
+cp .env.example .env                                  # fill in MySQL creds + AWS SES values
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver                            # http://localhost:8000
+```
+
+### 3. Frontend
 
 ```bash
 cd frontend
