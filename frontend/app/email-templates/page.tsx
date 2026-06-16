@@ -191,17 +191,19 @@ export default function EmailTemplatesPage() {
     if (!current) return "";
     const hasHtml = current.body_html.trim();
     const hasText = current.body.trim();
-    if (!hasHtml && !hasText) return "";
 
     let html: string;
     if (hasHtml) {
       html = current.body_html;
-    } else {
+    } else if (hasText) {
       // Plain-text email: mirror the backend (append signature text), preserve line breaks
       const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       let text = current.body;
       if (current.signature.trim()) text += "\n\n" + current.signature;
       html = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;white-space:pre-wrap">${esc(text)}</div>`;
+    } else {
+      // No body yet — faint placeholder, but still show the opt-out line below
+      html = `<div style="font-family:Arial,sans-serif;font-size:13px;color:#c0cdd6;font-style:italic">Your email body will appear here…</div>`;
     }
 
     for (const [key, val] of Object.entries(SAMPLE_VARS)) {
