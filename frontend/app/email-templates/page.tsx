@@ -220,13 +220,14 @@ export default function EmailTemplatesPage() {
       }
     }
 
-    // Opt-out line (a link; not clickable in preview)
+    // Opt-out line — shown as a styled (non-clickable) link in the preview
     const optText = (current.opt_out_text ?? "").trim() || DEFAULT_OPT_OUT_TEXT;
-    const optLink = `<a href="#" style="color:#054B70">${optText}</a>`;
+    const optLink = `<span style="color:#054B70;text-decoration:underline">${optText}</span>`;
     if (html.includes("{{opt_out}}")) html = html.split("{{opt_out}}").join(optLink);
     else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
 
-    return html;
+    // Open any real links in a new tab so clicks don't navigate the sandboxed preview iframe
+    return `<base target="_blank">` + html;
   }, [current, sigPreviewUrl, SAMPLE_VARS]);
 
   useEffect(() => {

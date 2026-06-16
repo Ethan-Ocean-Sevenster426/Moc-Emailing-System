@@ -211,12 +211,12 @@ export default function TemplateLibraryPage() {
       html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
     }
     if (form.signature) html += `<div style="margin-top:12px;white-space:pre-wrap">${form.signature}</div>`;
-    // Opt-out line (rendered as a link; not clickable in preview)
+    // Opt-out line — styled, non-clickable in preview
     const optText = (form.opt_out_text ?? "").trim() || DEFAULT_OPT_OUT_TEXT;
-    const optLink = `<a href="#" style="color:#054B70">${optText}</a>`;
+    const optLink = `<span style="color:#054B70;text-decoration:underline">${optText}</span>`;
     if (html.includes("{{opt_out}}")) html = html.split("{{opt_out}}").join(optLink);
     else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
-    return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;padding:4px">${html}</div>`;
+    return `<base target="_blank"><div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;padding:4px">${html}</div>`;
   })();
 
   const inputCls = "input-glow w-full rounded-xl border border-[#d0dce4] bg-[#f7f9fb] px-3 py-2.5 text-[13px] text-[#0a2a3c] placeholder-[#b0c4d0] outline-none";
