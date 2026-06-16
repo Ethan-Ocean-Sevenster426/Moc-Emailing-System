@@ -1,0 +1,36 @@
+# ───────────── Secrets & local data ─────────────
+.env
+.env.local
+*.env
+!*.env.example
+
+# Django database & uploaded media (contains real contact data / files)
+backend/db.sqlite3
+*.sqlite3
+backend/media/
+
+# ───────────── Python ─────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# ───────────── Node / Next.js ─────────────
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# ───────────── Editor / OS ─────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
