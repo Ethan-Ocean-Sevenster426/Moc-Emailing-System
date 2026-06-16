@@ -70,6 +70,9 @@ export default function EmailTemplatesPage() {
   const [activeTP, setActiveTP] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ text: string; ok: boolean } | null>(null);
+  const [savedTPs, setSavedTPs] = useState<Set<number>>(new Set());
+  const [dirty, setDirty] = useState(false);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [clearAttach, setClearAttach] = useState(false);
   const [pendingSigImg, setPendingSigImg] = useState<File | null>(null);
@@ -239,7 +242,10 @@ export default function EmailTemplatesPage() {
       fetch(`${API}/templates-library/`, { credentials: "include" }).then((r) => r.json()),
     ])
       .then(([tplData, schedData, testEmailData, contactData, libData]) => {
-        if (tplData.ok) setTemplates(tplData.templates);
+        if (tplData.ok) {
+          setTemplates(tplData.templates);
+          setSavedTPs(new Set(tplData.templates.map((t: Template) => t.touchpoint_number)));
+        }
         if (schedData.ok) {
           setSchedules(schedData.schedules);
           if (schedData.limits) setLimits(schedData.limits);
@@ -266,9 +272,13 @@ export default function EmailTemplatesPage() {
     setSigPreviewUrl("");
     setSaveStatus(null);
     setTestResult(null);
+    setDirty(false);
     if (attachInputRef.current) attachInputRef.current.value = "";
     if (sigInputRef.current) sigInputRef.current.value = "";
   }, [activeTP]);
+
+  // True when the current touchpoint has unsaved edits or was never saved
+  const needsSave = activeTP != null && (dirty || !savedTPs.has(activeTP));
 
   // Fetch how many contacts are eligible for the touchpoint being sent (respects audience).
   useEffect(() => {
@@ -353,6 +363,7 @@ export default function EmailTemplatesPage() {
 
   function updateCurrent(field: keyof Template, value: string | number) {
     if (!activeTP) return;
+    setDirty(true);
     setTemplates((prev) => {
       const idx = prev.findIndex((t) => t.touchpoint_number === activeTP);
       if (idx >= 0) {
@@ -364,8 +375,9 @@ export default function EmailTemplatesPage() {
     });
   }
 
-  async function saveTemplate() {
-    if (!activeTP || !current) return;
+  async function saveTemplate(): Promise<boolean> {
+    if (!activeTP || !current) return false;
+    let saved = false;
     setSaving(true);
     setSaveStatus(null);
 
@@ -410,6 +422,9 @@ export default function EmailTemplatesPage() {
         setSigPreviewUrl("");
         if (attachInputRef.current) attachInputRef.current.value = "";
         if (sigInputRef.current) sigInputRef.current.value = "";
+        setSavedTPs((prev) => new Set(prev).add(activeTP));
+        setDirty(false);
+        saved = true;
         setSaveStatus({ text: "Template saved successfully", ok: true });
       } else {
         setSaveStatus({ text: data.error || "Error saving!", ok: false });
@@ -419,6 +434,26 @@ export default function EmailTemplatesPage() {
     }
     setSaving(false);
     setTimeout(() => setSaveStatus(null), 3000);
+    return saved;
+  }
+
+  const [pendingSend, setPendingSend] = useState<null | "test" | "bulk">(null);
+
+  // Open the bulk-send modal, but prompt to save first if there are unsaved changes
+  function openBulkSend(force = false) {
+    if (!force && needsSave) { setPendingSend("bulk"); setShowSavePrompt(true); return; }
+    setShowBulkSend(activeTP);
+    setBulkResult(null); setBulkGroupId(""); setBulkSegmentIds([]); setBulkTemplateId(""); setBulkLimit("");
+  }
+
+  async function saveThenContinue() {
+    const ok = await saveTemplate();
+    if (!ok) return;
+    setShowSavePrompt(false);
+    const action = pendingSend;
+    setPendingSend(null);
+    if (action === "test") sendTestEmail(true);
+    else if (action === "bulk") openBulkSend(true);
   }
 
   function addTestEmail() {
@@ -450,8 +485,9 @@ export default function EmailTemplatesPage() {
     }).catch(() => {});
   }
 
-  async function sendTestEmail() {
+  async function sendTestEmail(force = false) {
     if (testEmails.length === 0) return;
+    if (!force && needsSave) { setPendingSend("test"); setShowSavePrompt(true); return; }
 
     setTestSending(true);
     setTestResult(null);
@@ -602,7 +638,7 @@ export default function EmailTemplatesPage() {
               canEdit ? (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => { setShowBulkSend(activeTP); setBulkResult(null); setBulkGroupId(""); setBulkSegmentIds([]); setBulkTemplateId(""); setBulkLimit(""); }}
+                    onClick={() => openBulkSend()}
                     className="btn-press flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[12px] font-bold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white hover:border-emerald-600 sm:px-5"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
@@ -1120,7 +1156,7 @@ export default function EmailTemplatesPage() {
                     </div>
 
                     <button
-                      onClick={sendTestEmail}
+                      onClick={() => sendTestEmail()}
                       disabled={testSending || testEmails.length === 0}
                       className="btn-press w-full rounded-xl bg-[#054B70] py-2.5 text-[13px] font-bold text-white disabled:opacity-40"
                     >
@@ -1575,6 +1611,36 @@ export default function EmailTemplatesPage() {
                     Start Sending
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save-first prompt */}
+      {showSavePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => { setShowSavePrompt(false); setPendingSend(null); }}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50">
+              <svg className="h-6 w-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z" /></svg>
+            </div>
+            <h2 className="text-[16px] font-bold text-[#0a2a3c]">Save the template first</h2>
+            <p className="mt-1 mb-5 text-[13px] leading-relaxed text-[#6b8a9e]">
+              This touchpoint has unsaved changes. Save it so your email goes out with the latest content, then it&apos;ll {pendingSend === "test" ? "send the test" : "open the send dialog"}.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setShowSavePrompt(false); setPendingSend(null); }}
+                className="rounded-xl px-5 py-2.5 text-[12px] font-semibold text-[#6b8a9e] hover:bg-[#f0f4f7]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveThenContinue}
+                disabled={saving}
+                className="btn-press flex items-center gap-2 rounded-xl bg-[#054B70] px-5 py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save Template"}
               </button>
             </div>
           </div>
