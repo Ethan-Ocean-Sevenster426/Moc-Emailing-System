@@ -101,14 +101,14 @@ export default function LoginPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">
-                    Username
+                    Email
                   </label>
                   <input
                     type="text"
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
+                    placeholder="you@moc-pty.com"
                     className="input-glow w-full rounded-xl border border-[#d0dce4] bg-[#f7f9fb] px-4 py-3 text-sm text-[#0a2a3c] placeholder-[#b0c4d0] outline-none"
                   />
                 </div>
