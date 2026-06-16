@@ -210,16 +210,14 @@ export default function EmailTemplatesPage() {
       html = html.split(key).join(val);
     }
 
-    // Signature image only applies to HTML emails
-    if (hasHtml) {
-      const sigUrl = sigPreviewUrl || (current.signature_image_url ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${current.signature_image_url}` : "");
-      if (sigUrl) {
-        const hasDriveUrl = /https:\/\/drive\.google\.com\/thumbnail\?id=/i.test(html);
-        const hasCidRef = /cid:signature_tp\d+/i.test(html);
-        if (hasDriveUrl) html = html.replace(/https:\/\/drive\.google\.com\/thumbnail\?id=[^"'&]+(?:&amp;[^"']*|&[^"']*)*/gi, sigUrl);
-        if (hasCidRef) html = html.replace(/cid:signature_tp\d+/gi, sigUrl);
-        if (!hasDriveUrl && !hasCidRef) html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
-      }
+    // Signature image — render it in the preview whenever one is uploaded
+    const sigUrl = sigPreviewUrl || (current.signature_image_url ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${current.signature_image_url}` : "");
+    if (sigUrl) {
+      const hasDriveUrl = /https:\/\/drive\.google\.com\/thumbnail\?id=/i.test(html);
+      const hasCidRef = /cid:signature_tp\d+/i.test(html);
+      if (hasDriveUrl) html = html.replace(/https:\/\/drive\.google\.com\/thumbnail\?id=[^"'&]+(?:&amp;[^"']*|&[^"']*)*/gi, sigUrl);
+      else if (hasCidRef) html = html.replace(/cid:signature_tp\d+/gi, sigUrl);
+      else html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
     }
 
     // Opt-out line — shown as a styled (non-clickable) link in the preview
