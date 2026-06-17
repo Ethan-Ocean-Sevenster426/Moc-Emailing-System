@@ -203,10 +203,10 @@ export default function EmailTemplatesPage() {
       const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       let text = current.body;
       if (current.signature.trim()) text += "\n\n" + current.signature;
-      html = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;white-space:pre-wrap">${esc(text)}</div>`;
+      html = `<div style="font-family:'Poppins',Arial,sans-serif;font-size:9pt;color:#0a2a3c;white-space:pre-wrap">${esc(text)}</div>`;
     } else {
       // No body yet — faint placeholder, but still show the opt-out line below
-      html = `<div style="font-family:Arial,sans-serif;font-size:13px;color:#c0cdd6;font-style:italic">Your email body will appear here…</div>`;
+      html = `<div style="font-family:'Poppins',Arial,sans-serif;font-size:9pt;color:#c0cdd6;font-style:italic">Your email body will appear here…</div>`;
     }
 
     for (const [key, val] of Object.entries(SAMPLE_VARS)) {
@@ -233,7 +233,7 @@ export default function EmailTemplatesPage() {
     else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
 
     // Open any real links in a new tab so clicks don't navigate the sandboxed preview iframe
-    return `<base target="_blank">` + html;
+    return `<base target="_blank"><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><div style="font-family:'Poppins',Arial,sans-serif;font-size:9pt">` + html + `</div>`;
   }, [current, sigPreviewUrl, SAMPLE_VARS]);
 
   useEffect(() => {
@@ -920,7 +920,7 @@ export default function EmailTemplatesPage() {
                       value={current.body_html}
                       onChange={(e) => updateCurrent("body_html", e.target.value)}
                       readOnly={!canEdit}
-                      placeholder={`<div style="font-family: Arial; font-size: 14px;">\n  <p>Hi {{contact_name}},</p>\n  <p>Your email content...</p>\n</div>`}
+                      placeholder={`<div style="font-family: 'Poppins', Arial, sans-serif; font-size: 9pt;">\n  <p>Hi {{contact_name}},</p>\n  <p>Your email content...</p>\n</div>`}
                       className={`input-glow min-h-[280px] w-full resize-y rounded-xl border border-[#d0dce4] bg-[#f7f9fb] px-4 py-3 font-mono text-[12px] leading-relaxed text-[#0a2a3c] placeholder-[#b0c4d0] outline-none ${!canEdit ? "cursor-default opacity-70" : ""}`}
                       style={{ tabSize: 2 }}
                     />

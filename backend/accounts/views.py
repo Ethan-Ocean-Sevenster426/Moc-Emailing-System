@@ -117,9 +117,24 @@ def _check_bounces_for_job(job_id):
     return bounced_count
 
 
+def _wrap_email_html(body_fragment):
+    """Wrap an HTML body fragment in a full email document with Poppins 9pt."""
+    return (
+        '<!DOCTYPE html>'
+        '<html><head><meta charset="utf-8">'
+        '<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">'
+        '</head>'
+        '<body style="margin:0;padding:0;font-family:\'Poppins\',Arial,Helvetica,sans-serif;font-size:9pt;">'
+        f'{body_fragment}'
+        '</body></html>'
+    )
+
+
 def _ses_send_mail(to_address, subject, body_html=None, body_text=None,
                    from_address=None, from_name='Waldo Gaybba',
                    attachments=None, max_retries=3):
+    if body_html:
+        body_html = _wrap_email_html(body_html)
     if not from_address:
         from_address = django_settings.AWS_SES_FROM_EMAIL
 
@@ -246,7 +261,7 @@ def _optout_url(contact_id):
 def _text_to_html(text):
     """Convert a plain-text email body to simple HTML, preserving line breaks."""
     safe = escape(text or '').replace('\n', '<br>')
-    return f'<div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;line-height:1.6">{safe}</div>'
+    return f'<div style="font-family:\'Poppins\',Arial,sans-serif;font-size:9pt;color:#0a2a3c;line-height:1.6">{safe}</div>'
 
 
 def _apply_opt_out(html, opt_out_text, contact_id, is_html=True):
@@ -268,7 +283,7 @@ def _apply_opt_out(html, opt_out_text, contact_id, is_html=True):
         )
     else:
         linked = f'<a href="{url}" style="color:#054B70">{safe}</a>'
-    footer = f'<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">{linked}</div>'
+    footer = f'<div style="margin-top:18px;font-family:\'Poppins\',Arial,sans-serif;font-size:9pt;color:#8ca3b3;line-height:1.5">{linked}</div>'
     if '{{opt_out}}' in html:
         return html.replace('{{opt_out}}', linked)
     return html + footer

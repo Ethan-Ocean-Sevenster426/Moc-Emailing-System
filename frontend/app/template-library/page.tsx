@@ -60,6 +60,7 @@ export default function TemplateLibraryPage() {
 
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
   const [editorTab, setEditorTab] = useState<"edit" | "preview">("edit");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -91,6 +92,7 @@ export default function TemplateLibraryPage() {
     resetFiles();
     setPickerOpen(false);
     setEditorTab("edit");
+    setTestResult(null);
   }
 
   function editTemplate(t: LibraryTemplate) {
@@ -108,6 +110,7 @@ export default function TemplateLibraryPage() {
     });
     resetFiles();
     setPickerOpen(false);
+    setTestResult(null);
   }
 
   function insertVar(v: string) {
@@ -162,6 +165,7 @@ export default function TemplateLibraryPage() {
     const email = testEmail.trim();
     if (!email || !email.includes("@")) { showToast("Enter a valid test email", false); return; }
     setTestSending(true);
+    setTestResult(null);
     try {
       const res = await fetch(`${API}/templates-library/send-test/`, {
         method: "POST",
@@ -170,8 +174,16 @@ export default function TemplateLibraryPage() {
         credentials: "include",
       });
       const data = await res.json();
-      showToast(data.ok ? data.message : (data.error || "Could not send test"), !!data.ok);
+      if (data.ok) {
+        const now = new Date().toLocaleString();
+        setTestResult(`Sent to ${email} — ${now}`);
+        showToast(data.message || "Test sent");
+      } else {
+        setTestResult(`Failed — ${data.error || "Unknown error"}`);
+        showToast(data.error || "Could not send test", false);
+      }
     } catch {
+      setTestResult("Failed — Network error");
       showToast("Network error sending test", false);
     }
     setTestSending(false);
@@ -219,7 +231,7 @@ export default function TemplateLibraryPage() {
       : `<span style="${optStyle}">${optText}</span>`;
     if (html.includes("{{opt_out}}")) html = html.split("{{opt_out}}").join(optLink);
     else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
-    return `<base target="_blank"><div style="font-family:Arial,sans-serif;font-size:14px;color:#0a2a3c;padding:4px">${html}</div>`;
+    return `<base target="_blank"><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><div style="font-family:'Poppins',Arial,sans-serif;font-size:9pt;color:#0a2a3c;padding:4px">${html}</div>`;
   })();
 
   const inputCls = "input-glow w-full rounded-xl border border-[#d0dce4] bg-[#f7f9fb] px-3 py-2.5 text-[13px] text-[#0a2a3c] placeholder-[#b0c4d0] outline-none";
@@ -391,6 +403,17 @@ export default function TemplateLibraryPage() {
                   </div>
 
                   <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">Body</label>
+                    <textarea
+                      value={form.body}
+                      onChange={(e) => setForm({ ...form, body: e.target.value })}
+                      placeholder="Hello {{contact_name}}, plain text version…"
+                      rows={6}
+                      className={`${inputCls} resize-y`}
+                    />
+                  </div>
+
+                  <div>
                     <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">HTML Body</label>
                     <textarea
                       ref={bodyRef}
@@ -498,6 +521,9 @@ export default function TemplateLibraryPage() {
                       {testSending ? "Sending…" : "Send Test"}
                     </button>
                   </div>
+                  {testResult && (
+                    <p className={`mt-3 text-[12px] font-semibold animate-fade-in ${testResult.startsWith("Failed") ? "text-red-500" : "text-[#054B70]"}`}>{testResult}</p>
+                  )}
                 </div>
               )}
               </>
