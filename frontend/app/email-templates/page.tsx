@@ -220,7 +220,7 @@ export default function EmailTemplatesPage() {
       const hasCidRef = /cid:signature_tp\d+/i.test(html);
       if (hasDriveUrl) html = html.replace(/https:\/\/drive\.google\.com\/thumbnail\?id=[^"'&]+(?:&amp;[^"']*|&[^"']*)*/gi, sigUrl);
       else if (hasCidRef) html = html.replace(/cid:signature_tp\d+/gi, sigUrl);
-      else html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:320px;height:auto" /></div>`;
+      else html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:260px;height:auto" /></div>`;
     }
 
     // Opt-out line — underline the word "here" (non-clickable in preview), matching the email

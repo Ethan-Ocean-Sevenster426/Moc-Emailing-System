@@ -220,7 +220,7 @@ export default function TemplateLibraryPage() {
     const sigUrl = sigFile ? URL.createObjectURL(sigFile) : (!clearSig && form.signature_image_url ? `${BACKEND}${form.signature_image_url}` : "");
     if (sigUrl) html = html.replace(/cid:signature_tpl?\w*/gi, sigUrl);
     if (sigUrl && !/<img/i.test(form.body_html)) {
-      html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:320px;height:auto" /></div>`;
+      html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:260px;height:auto" /></div>`;
     }
     if (form.signature) html += `<div style="margin-top:12px;white-space:pre-wrap">${form.signature}</div>`;
     // Opt-out line — underline the word "here" (non-clickable in preview), matching the email
