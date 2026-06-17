@@ -1058,7 +1058,7 @@ def send_test_email(request):
                 )
             elif not has_cid_ref:
                 # No reference exists — append signature image at the end
-                body_content += f'<div style="margin-top:16px"><img src="cid:{cid}" alt="Signature" width="200" style="width:200px;max-width:200px;height:auto" /></div>'
+                body_content += f'<div style="margin-top:16px"><img src="cid:{cid}" alt="Signature" width="500" style="width:500px;max-width:500px;height:auto" /></div>'
 
             with open(sig_path, 'rb') as sf:
                 sig_inline = {
@@ -1706,7 +1706,7 @@ def templates_library_send_test(request):
             ext = os.path.splitext(sig_name)[1].lower().lstrip('.') or 'png'
             cid = f'signature_tpl{tpl.id}'
             if not re.search(r'cid:signature_tpl?\d+', body_content, flags=re.IGNORECASE):
-                body_content += f'<div style="margin-top:16px"><img src="cid:{cid}" alt="Signature" width="200" style="width:200px;max-width:200px;height:auto" /></div>'
+                body_content += f'<div style="margin-top:16px"><img src="cid:{cid}" alt="Signature" width="500" style="width:500px;max-width:500px;height:auto" /></div>'
             with open(sig_path, 'rb') as sf:
                 sig_inline = {
                     'name': sig_name,
@@ -2023,7 +2023,7 @@ def _run_bulk_send(job_id):
                     f'cid:{cid}', body_content, flags=re.IGNORECASE,
                 )
             elif not has_cid_ref:
-                body_content += f'<div style="margin-top:16px"><img src="cid:{cid}" alt="Signature" width="200" style="width:200px;max-width:200px;height:auto" /></div>'
+                body_content += f'<div style="margin-top:16px"><img src="cid:{cid}" alt="Signature" width="500" style="width:500px;max-width:500px;height:auto" /></div>'
 
             with open(sig_path, 'rb') as sf:
                 sig_inline = {
