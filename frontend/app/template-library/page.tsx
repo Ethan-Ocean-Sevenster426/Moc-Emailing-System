@@ -220,15 +220,13 @@ export default function TemplateLibraryPage() {
     const sigUrl = sigFile ? URL.createObjectURL(sigFile) : (!clearSig && form.signature_image_url ? `${BACKEND}${form.signature_image_url}` : "");
     if (sigUrl) html = html.replace(/cid:signature_tpl?\w*/gi, sigUrl);
     if (sigUrl && !/<img/i.test(form.body_html)) {
-      html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
+      html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:320px;height:auto" /></div>`;
     }
     if (form.signature) html += `<div style="margin-top:12px;white-space:pre-wrap">${form.signature}</div>`;
     // Opt-out line — underline the word "here" (non-clickable in preview), matching the email
     const optText = (form.opt_out_text ?? "").trim() || DEFAULT_OPT_OUT_TEXT;
     const optStyle = "color:#054B70;text-decoration:underline";
-    const optLink = /here/i.test(optText)
-      ? optText.replace(/(here)(?![\s\S]*here)/i, `<span style="${optStyle}">$1</span>`)
-      : `<span style="${optStyle}">${optText}</span>`;
+    const optLink = `<span style="${optStyle}">${optText}</span>`;
     if (html.includes("{{opt_out}}")) html = html.split("{{opt_out}}").join(optLink);
     else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
     return `<base target="_blank"><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><div style="font-family:'Poppins',Arial,sans-serif;font-size:9pt;color:#0a2a3c;padding:4px">${html}</div>`;

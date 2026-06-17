@@ -220,15 +220,13 @@ export default function EmailTemplatesPage() {
       const hasCidRef = /cid:signature_tp\d+/i.test(html);
       if (hasDriveUrl) html = html.replace(/https:\/\/drive\.google\.com\/thumbnail\?id=[^"'&]+(?:&amp;[^"']*|&[^"']*)*/gi, sigUrl);
       else if (hasCidRef) html = html.replace(/cid:signature_tp\d+/gi, sigUrl);
-      else html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:200px;height:auto" /></div>`;
+      else html += `<div style="margin-top:16px"><img src="${sigUrl}" alt="Signature" style="max-width:320px;height:auto" /></div>`;
     }
 
     // Opt-out line — underline the word "here" (non-clickable in preview), matching the email
     const optText = (current.opt_out_text ?? "").trim() || DEFAULT_OPT_OUT_TEXT;
     const optStyle = "color:#054B70;text-decoration:underline";
-    const optLink = /here/i.test(optText)
-      ? optText.replace(/(here)(?![\s\S]*here)/i, `<span style="${optStyle}">$1</span>`)
-      : `<span style="${optStyle}">${optText}</span>`;
+    const optLink = `<span style="${optStyle}">${optText}</span>`;
     if (html.includes("{{opt_out}}")) html = html.split("{{opt_out}}").join(optLink);
     else html += `<div style="margin-top:18px;font-size:12px;color:#8ca3b3;line-height:1.5">${optLink}</div>`;
 
