@@ -341,7 +341,7 @@ export default function UsersPage() {
                     {/* Name */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#054B70]/8 text-[12px] font-bold text-[#054B70]">
-                        {u.first_name?.[0]?.toUpperCase() || u.email[0].toUpperCase()}
+                        {u.first_name?.[0]?.toUpperCase() || u.email?.[0]?.toUpperCase() || "?"}
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-semibold text-[#0a2a3c]">
