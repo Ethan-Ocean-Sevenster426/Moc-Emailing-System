@@ -279,7 +279,7 @@ export default function UsersPage() {
                       <th className="px-4 py-3 text-[13px] font-semibold text-gray-950">Email</th>
                       <th className="px-4 py-3 text-[13px] font-semibold text-gray-950">User type</th>
                       <th className="px-4 py-3 text-[13px] font-semibold text-gray-950">Active</th>
-                      <th className="px-4 py-3" />
+                      <th className="px-4 py-3 text-right text-[13px] font-semibold text-gray-950">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-950/5">
@@ -296,13 +296,15 @@ export default function UsersPage() {
                           )}
                         </td>
                         <td className="px-4 py-3.5 text-right">
-                          {u.role !== "admin" && (
+                          {u.role !== "admin" ? (
                             <button
                               onClick={() => { setEditing(u); setEditRole(u.role); setConfirmDelete(false); }}
                               className="text-[13px] font-semibold text-[#054B70] hover:underline"
                             >
                               Edit
                             </button>
+                          ) : (
+                            <span className="text-[13px] text-gray-400" title="Admin accounts are managed outside the app">—</span>
                           )}
                         </td>
                       </tr>
