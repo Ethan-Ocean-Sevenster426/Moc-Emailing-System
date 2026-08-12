@@ -239,7 +239,13 @@ export default function ContactsPage() {
     setTimeout(() => setToast(null), 3000);
   }
 
+  // Guards against out-of-order responses: fast typing fires a request per
+  // keystroke, and a slow early response ("ethan") must never overwrite the
+  // results of the final query ("ethansevenster5@...").
+  const fetchSeqRef = useRef(0);
+
   async function fetchContacts() {
+    const seq = ++fetchSeqRef.current;
     try {
       const params = new URLSearchParams();
       if (filter) params.set("status", filter);
@@ -249,6 +255,7 @@ export default function ContactsPage() {
       if (segmentFilter) params.set("segment", segmentFilter);
       const res = await fetch(`${API}/contacts/?${params}`, { credentials: "include" });
       const data = await res.json();
+      if (seq !== fetchSeqRef.current) return; // stale — a newer search is in flight
       if (data.ok) {
         setContacts(data.contacts);
         setCounts(data.counts);
@@ -263,8 +270,10 @@ export default function ContactsPage() {
   }
 
   useEffect(() => {
-    fetchContacts();
-  }, [filter, search, tpFilter, groupFilter, segmentFilter]);
+    // Debounce typing a little; filter clicks refresh immediately
+    const t = setTimeout(fetchContacts, search ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [filter, search, tpFilter, groupFilter, segmentFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Allow deep-links like /contacts?status=undeliverable (used by Reporting)
   useEffect(() => {
