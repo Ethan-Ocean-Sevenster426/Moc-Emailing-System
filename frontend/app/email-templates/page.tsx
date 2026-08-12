@@ -2360,7 +2360,8 @@ function EmailTemplatesPageInner() {
                           <input
                             type="number"
                             min={0}
-                            value={addParts[unit]}
+                            value={addParts[unit] || ""}
+                            placeholder="0"
                             onChange={(e) => setAddParts((p) => ({ ...p, [unit]: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
                             className="input-glow w-full rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-center text-[13px] text-gray-950 outline-none"
                           />
@@ -2538,7 +2539,8 @@ function EmailTemplatesPageInner() {
                   <input
                     type="number"
                     min={0}
-                    value={waitParts[unit]}
+                    value={waitParts[unit] || ""}
+                    placeholder="0"
                     onChange={(e) => setWaitParts((p) => ({ ...p, [unit]: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
                     className="input-glow w-full rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-center text-[13px] text-gray-900 outline-none"
                   />
