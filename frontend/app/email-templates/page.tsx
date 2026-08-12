@@ -196,9 +196,9 @@ function EmailTemplatesPageInner() {
   const [addParts, setAddParts] = useState<WaitParts>(EMPTY_WAIT);
   const [addTime, setAddTime] = useState("");
   const [addDate, setAddDate] = useState("");
-  // Whether this email waits at all — "no" collapses the wait menu and sends
-  // immediately after the previous email
-  const [addWait, setAddWait] = useState(true);
+  // Whether this email waits at all — "no" (the default) collapses the wait
+  // menu and sends immediately after the previous email
+  const [addWait, setAddWait] = useState(false);
   const [addTemplateId, setAddTemplateId] = useState("");
   // Explicit "fresh vs template" choice so the two paths are obvious
   const [addFrom, setAddFrom] = useState<"fresh" | "template">("fresh");
@@ -206,10 +206,10 @@ function EmailTemplatesPageInner() {
 
   function openAddTouchpoint() {
     setAddAfter(String(board.length ? board[board.length - 1].touchpoint_number : 0));
-    setAddParts(EMPTY_WAIT);
+    setAddParts({ months: 0, weeks: 0, days: 0, hours: 0, minutes: 0 });
     setAddTime("");
     setAddDate("");
-    setAddWait(true);
+    setAddWait(false);
     setAddTemplateId("");
     setAddFrom("fresh");
     setShowAddTp(true);
