@@ -702,14 +702,6 @@ export default function CampaignGroupsPage() {
               placeholder="Pick a group…"
             />
 
-            <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-500">
-              How does it run? <span className="text-red-500">*</span>
-            </p>
-            <label className="mb-3 flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] text-gray-950">
-              <input type="radio" checked readOnly className="accent-[#054B70]" />
-              Normal — you start sends yourself
-            </label>
-
             <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Audience (segment)</label>
             <Select
               value={cSegmentId}

@@ -69,7 +69,8 @@ export default function Select({
     // Always prefer opening DOWNWARD: clamp the panel to the space below and let
     // it scroll internally. Only flip above as a last resort when the space
     // below is unusably small AND there's clearly more room above.
-    const desired = Math.min(office(options.length) + (searchable ? 46 : 0) + 10, 300);
+    // At least one row of height so empty panels ("No options available.") still show
+    const desired = Math.min(Math.max(office(options.length), 40) + (searchable ? 46 : 0) + 10, 300);
     const spaceBelow = window.innerHeight - rect.bottom - 12;
     const spaceAbove = rect.top - 12;
     let top: number;
