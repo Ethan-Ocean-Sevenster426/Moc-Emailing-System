@@ -149,7 +149,7 @@ function EmailTemplatesPageInner() {
   }, [campaignId]);
 
   // Board data: journey progress, bounce splits, waits, goodbyes per touchpoint
-  interface BoardGoodbye { subject: string; has_content: boolean; test_number: number }
+  interface BoardGoodbye { name: string; subject: string; has_content: boolean; test_number: number }
   interface WaitParts { months: number; weeks: number; days: number; hours: number; minutes: number }
   interface BoardTP {
     touchpoint_number: number;
@@ -241,13 +241,14 @@ function EmailTemplatesPageInner() {
     setAddBusy(false);
   }
 
-  // Inline rename: give a touchpoint a custom label instead of "Touchpoint N"
+  // Inline rename: a custom label for a touchpoint (or a goodbye email,
+  // addressed by its storage number) instead of the default name
   const [renameTp, setRenameTp] = useState<number | null>(null);
   const [renameVal, setRenameVal] = useState("");
 
-  function startRename(bt: BoardTP) {
-    setRenameTp(bt.touchpoint_number);
-    setRenameVal(bt.name || "");
+  function startRename(tpNumber: number, currentName: string) {
+    setRenameTp(tpNumber);
+    setRenameVal(currentName);
   }
 
   async function saveRename() {
@@ -255,7 +256,9 @@ function EmailTemplatesPageInner() {
     const tp = renameTp;
     const name = renameVal.trim();
     setRenameTp(null);
-    const prev = board.find((b) => b.touchpoint_number === tp)?.name || "";
+    const prev = tp >= GOODBYE_OFFSET
+      ? (board.find((b) => b.goodbye?.test_number === tp)?.goodbye?.name || "")
+      : (board.find((b) => b.touchpoint_number === tp)?.name || "");
     if (name === prev) return;
     try {
       const res = await fetch(`${API}/flow/touchpoint/rename/`, {
@@ -266,7 +269,8 @@ function EmailTemplatesPageInner() {
       });
       const data = await res.json();
       if (data.ok) {
-        notifyBoard(name ? `Renamed to "${name}"` : `Name cleared — back to "Touchpoint ${tp}"`);
+        const fallback = tp >= GOODBYE_OFFSET ? "Goodbye email" : `Touchpoint ${tp}`;
+        notifyBoard(name ? `Renamed to "${name}"` : `Name cleared — back to "${fallback}"`);
         fetchBoard();
       } else notifyBoard(data.error || "Could not rename");
     } catch { notifyBoard("Could not rename"); }
@@ -1207,8 +1211,8 @@ function EmailTemplatesPageInner() {
                                       role="button"
                                       tabIndex={0}
                                       title="Rename — use your own name for this touchpoint"
-                                      onClick={(e) => { e.stopPropagation(); startRename(bt); }}
-                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); startRename(bt); } }}
+                                      onClick={(e) => { e.stopPropagation(); startRename(n, bt.name || ""); }}
+                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); startRename(n, bt.name || ""); } }}
                                       className="shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
                                     >
                                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -1344,11 +1348,40 @@ function EmailTemplatesPageInner() {
                                     >
                                       Opted out{bt.optouts > 0 ? ` · ${bt.optouts}` : ""}
                                     </button>
-                                    <span className="text-[14px] font-bold text-gray-950">Goodbye email</span>
-                                    {bt.goodbye.has_content ? (
-                                      <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-700">Ready</span>
+                                    {renameTp === bt.goodbye.test_number ? (
+                                      <input
+                                        autoFocus
+                                        value={renameVal}
+                                        onChange={(e) => setRenameVal(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setRenameTp(null); }}
+                                        onBlur={saveRename}
+                                        placeholder="Goodbye email"
+                                        maxLength={200}
+                                        className="min-w-0 flex-1 rounded-md bg-white px-2 py-1 text-[14px] font-bold text-gray-950 outline-none ring-2 ring-[#054B70]"
+                                      />
                                     ) : (
-                                      <span className="rounded-full bg-gray-400/15 px-2 py-0.5 text-[10px] font-semibold text-gray-500">Empty</span>
+                                      <>
+                                        <span className="flex min-w-0 items-center gap-1.5 text-[14px] font-bold text-gray-950">
+                                          <span className="truncate">{bt.goodbye.name || "Goodbye email"}</span>
+                                          {canEdit && (
+                                            <button
+                                              type="button"
+                                              title="Rename — use your own name for this goodbye email"
+                                              onClick={() => startRename(bt.goodbye!.test_number, bt.goodbye!.name || "")}
+                                              className="shrink-0 rounded p-0.5 text-gray-400 transition-colors hover:bg-amber-500/10 hover:text-gray-600"
+                                            >
+                                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+                                              </svg>
+                                            </button>
+                                          )}
+                                        </span>
+                                        {bt.goodbye.has_content ? (
+                                          <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-700">Ready</span>
+                                        ) : (
+                                          <span className="rounded-full bg-gray-400/15 px-2 py-0.5 text-[10px] font-semibold text-gray-500">Empty</span>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                   <p className="my-1.5 truncate text-[12px] text-gray-500">{bt.goodbye.subject || "No subject yet"}</p>
@@ -1440,7 +1473,36 @@ function EmailTemplatesPageInner() {
                   </button>
                   {activeTP >= GOODBYE_OFFSET ? (
                     <>
-                      <h2 className="text-[16px] font-bold text-gray-950">Goodbye email — if they opt out after Touchpoint {activeTP - GOODBYE_OFFSET}</h2>
+                      {renameTp === activeTP ? (
+                        <input
+                          autoFocus
+                          value={renameVal}
+                          onChange={(e) => setRenameVal(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setRenameTp(null); }}
+                          onBlur={saveRename}
+                          placeholder="Goodbye email"
+                          maxLength={200}
+                          className="w-full max-w-md rounded-md bg-gray-50 px-2 py-1 text-[16px] font-bold text-gray-950 outline-none ring-2 ring-[#054B70]"
+                        />
+                      ) : (
+                        <h2 className="flex items-center gap-2 text-[16px] font-bold text-gray-950">
+                          <span className="truncate">
+                            {board.find((b) => b.goodbye?.test_number === activeTP)?.goodbye?.name || `Goodbye email — if they opt out after Touchpoint ${activeTP - GOODBYE_OFFSET}`}
+                          </span>
+                          {canEdit && board.some((b) => b.goodbye?.test_number === activeTP) && (
+                            <button
+                              type="button"
+                              title="Rename — use your own name for this goodbye email"
+                              onClick={() => startRename(activeTP, board.find((b) => b.goodbye?.test_number === activeTP)?.goodbye?.name || "")}
+                              className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+                              </svg>
+                            </button>
+                          )}
+                        </h2>
+                      )}
                       <p className="mt-0.5 text-[12px] text-gray-500">Sent once, automatically, when someone opts out right after this touchpoint. Leave the opt-out sentence blank — they have already opted out.</p>
                     </>
                   ) : renameTp === activeTP ? (
@@ -1461,7 +1523,7 @@ function EmailTemplatesPageInner() {
                         <button
                           type="button"
                           title="Rename — use your own name instead of Touchpoint N"
-                          onClick={() => startRename(board.find((b) => b.touchpoint_number === activeTP) || ({ touchpoint_number: activeTP, name: "" } as BoardTP))}
+                          onClick={() => startRename(activeTP, board.find((b) => b.touchpoint_number === activeTP)?.name || "")}
                           className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

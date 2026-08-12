@@ -1579,6 +1579,7 @@ def flow_board(request):
 
     def gb_dict(g):
         return {
+            'name': g.name,
             'subject': g.subject,
             'has_content': bool(g.subject or g.body or g.body_html),
             'test_number': g.touchpoint_number,
@@ -1724,7 +1725,8 @@ def flow_touchpoint_add(request):
 @require_http_methods(["POST"])
 @require_role('admin', 'editor')
 def flow_touchpoint_rename(request):
-    """Give a touchpoint a custom label (blank = back to "Touchpoint N")."""
+    """Give a touchpoint (or a goodbye email, by its storage number) a custom
+    label. Blank = back to the default name."""
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -1732,8 +1734,14 @@ def flow_touchpoint_rename(request):
     tp_num = data.get('touchpoint_number')
     if not tp_num or int(tp_num) < 1:
         return JsonResponse({'error': 'touchpoint_number required'}, status=400)
+    n = int(tp_num)
     campaign = _resolve_campaign(data.get('campaign_id'))
-    tpl, _ = TouchpointTemplate.objects.get_or_create(touchpoint_number=int(tp_num), campaign=campaign)
+    if n >= TouchpointTemplate.GOODBYE_OFFSET:
+        tpl = TouchpointTemplate.objects.filter(touchpoint_number=n, campaign=campaign, is_goodbye=True).first()
+        if not tpl:
+            return JsonResponse({'error': 'Goodbye email not found'}, status=404)
+    else:
+        tpl, _ = TouchpointTemplate.objects.get_or_create(touchpoint_number=n, campaign=campaign)
     tpl.name = (data.get('name') or '').strip()[:200]
     tpl.save(update_fields=['name', 'updated_at'])
     return JsonResponse({'ok': True, 'name': tpl.name})
