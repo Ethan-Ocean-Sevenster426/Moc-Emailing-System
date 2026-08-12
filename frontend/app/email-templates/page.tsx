@@ -1443,9 +1443,32 @@ function EmailTemplatesPageInner() {
                       <h2 className="text-[16px] font-bold text-gray-950">Goodbye email — if they opt out after Touchpoint {activeTP - GOODBYE_OFFSET}</h2>
                       <p className="mt-0.5 text-[12px] text-gray-500">Sent once, automatically, when someone opts out right after this touchpoint. Leave the opt-out sentence blank — they have already opted out.</p>
                     </>
+                  ) : renameTp === activeTP ? (
+                    <input
+                      autoFocus
+                      value={renameVal}
+                      onChange={(e) => setRenameVal(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setRenameTp(null); }}
+                      onBlur={saveRename}
+                      placeholder={`Touchpoint ${activeTP}`}
+                      maxLength={200}
+                      className="w-full max-w-md rounded-md bg-gray-50 px-2 py-1 text-[16px] font-bold text-gray-950 outline-none ring-2 ring-[#054B70]"
+                    />
                   ) : (
-                    <h2 className="text-[16px] font-bold text-gray-950">
-                      {board.find((b) => b.touchpoint_number === activeTP)?.name || `Touchpoint ${activeTP}`}
+                    <h2 className="flex items-center gap-2 text-[16px] font-bold text-gray-950">
+                      <span className="truncate">{board.find((b) => b.touchpoint_number === activeTP)?.name || `Touchpoint ${activeTP}`}</span>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          title="Rename — use your own name instead of Touchpoint N"
+                          onClick={() => startRename(board.find((b) => b.touchpoint_number === activeTP) || ({ touchpoint_number: activeTP, name: "" } as BoardTP))}
+                          className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+                          </svg>
+                        </button>
+                      )}
                     </h2>
                   )}
                 </div>
