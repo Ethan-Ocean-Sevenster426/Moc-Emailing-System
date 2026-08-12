@@ -37,6 +37,50 @@ function splitValue(v: string): { date: string; time: string } {
   return { date: date || "", time: (time || "").slice(0, 5) };
 }
 
+// Easter Sunday (anonymous Gregorian algorithm) — for Good Friday / Easter Monday
+function easterSunday(year: number): Date {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month, day);
+}
+
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** Widely-observed holidays when inboxes go quiet. */
+export function holidayName(d: Date): string | null {
+  const m = d.getMonth() + 1, day = d.getDate();
+  if (m === 1 && day === 1) return "New Year's Day";
+  if (m === 5 && day === 1) return "Workers' Day";
+  if (m === 12 && day === 24) return "Christmas Eve";
+  if (m === 12 && day === 25) return "Christmas Day";
+  if (m === 12 && day === 26) return "Boxing Day";
+  if (m === 12 && day === 31) return "New Year's Eve";
+  const easter = easterSunday(d.getFullYear());
+  const goodFriday = new Date(easter); goodFriday.setDate(easter.getDate() - 2);
+  const easterMonday = new Date(easter); easterMonday.setDate(easter.getDate() + 1);
+  if (sameDay(d, goodFriday)) return "Good Friday";
+  if (sameDay(d, easterMonday)) return "Easter Monday";
+  return null;
+}
+
+/** Friendly heads-up when a picked date is likely to underperform. */
+export function dateAdvice(d: Date): string | null {
+  const hol = holidayName(d);
+  if (hol) return `Heads up — that's ${hol}. Most people are away from their inbox over holidays, so this email may go unread. A regular working day usually lands better.`;
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return `Heads up — that's a ${dow === 0 ? "Sunday" : "Saturday"}. Business emails sent on weekends tend to sit unread until Monday morning's pile-up.`;
+  if (dow === 1) return "Heads up — that's a Monday. Inboxes are at their fullest after the weekend, so emails are easy to miss. Tuesday to Thursday usually gets more attention.";
+  if (dow === 5) return "Heads up — that's a Friday. Emails often get parked for the weekend and forgotten. Tuesday to Thursday usually gets more attention.";
+  return null;
+}
+
 export default function DatePicker({
   value,
   defaultValue,
@@ -62,6 +106,8 @@ export default function DatePicker({
   const selectedDate = datePart ? new Date(`${datePart}T00:00:00`) : null;
   const [viewYear, setViewYear] = useState((selectedDate || today).getFullYear());
   const [viewMonth, setViewMonth] = useState((selectedDate || today).getMonth());
+  // Which header dropdown (month/year) is open — custom panels, not native selects
+  const [headerMenu, setHeaderMenu] = useState<"" | "month" | "year">("");
 
   const PANEL_W = 288;
   const PANEL_H = withTime ? 430 : 390;
@@ -79,6 +125,7 @@ export default function DatePicker({
   // Close on outside click / Escape; keep the panel glued to the trigger
   useEffect(() => {
     if (!open) return;
+    setHeaderMenu("");
     reposition();
     function onDown(e: MouseEvent) {
       const t = e.target as Node;
@@ -182,6 +229,16 @@ export default function DatePicker({
         <span className="truncate">{display || placeholder || (withTime ? "Pick date & time" : "Pick a date")}</span>
       </button>
 
+      {/* Friendly heads-up for holidays, Mondays/Fridays and weekends */}
+      {selectedDate && dateAdvice(selectedDate) && (
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium leading-snug text-amber-700">
+          <svg className="mt-0.5 h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <span>{dateAdvice(selectedDate)}</span>
+        </p>
+      )}
+
       {/* Panel — portaled to <body> so overflow-hidden ancestors can't clip it */}
       {open && typeof document !== "undefined" && createPortal(
         <motion.div
@@ -191,28 +248,58 @@ export default function DatePicker({
           transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.8 }}
           style={{ position: "fixed", top: pos.top, left: pos.left, width: PANEL_W, transformOrigin: "top left" }}
           className="z-[80] rounded-lg bg-white p-4 shadow-lg ring-1 ring-gray-950/5">
-          {/* Header — Filament style: month + year selects, chevron steppers */}
-          <div className="mb-2 flex items-center justify-between gap-1">
+          {/* Header — custom month + year dropdowns (styled like Select), chevron steppers */}
+          <div className="relative mb-2 flex items-center justify-between gap-1">
             <div className="flex flex-1 items-center gap-1">
-              <select
-                value={viewMonth}
-                onChange={(e) => setViewMonth(Number(e.target.value))}
-                className="flex-1 cursor-pointer rounded-lg border-0 bg-transparent py-1 pl-1 pr-6 text-[13px] font-medium text-gray-950 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#054B70]"
+              <button
+                type="button"
+                onClick={() => setHeaderMenu(headerMenu === "month" ? "" : "month")}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-medium text-gray-950 transition-colors hover:bg-gray-100 ${headerMenu === "month" ? "bg-gray-100" : ""}`}
               >
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i}>{m}</option>
-                ))}
-              </select>
-              <select
-                value={viewYear}
-                onChange={(e) => setViewYear(Number(e.target.value))}
-                className="cursor-pointer rounded-lg border-0 bg-transparent py-1 pl-1 pr-6 text-[13px] font-medium text-gray-950 outline-none hover:bg-gray-50 focus:ring-2 focus:ring-[#054B70]"
+                {MONTHS[viewMonth]}
+                <svg className={`h-3.5 w-3.5 text-gray-400 transition-transform ${headerMenu === "month" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHeaderMenu(headerMenu === "year" ? "" : "year")}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-medium text-gray-950 transition-colors hover:bg-gray-100 ${headerMenu === "year" ? "bg-gray-100" : ""}`}
               >
-                {Array.from({ length: 21 }, (_, i) => today.getFullYear() - 10 + i).map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+                {viewYear}
+                <svg className={`h-3.5 w-3.5 text-gray-400 transition-transform ${headerMenu === "year" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7" /></svg>
+              </button>
             </div>
+            {headerMenu === "month" && (
+              <div className="absolute left-0 top-9 z-10 max-h-52 w-40 overflow-y-auto rounded-lg bg-white p-1 shadow-lg ring-1 ring-gray-950/10">
+                {MONTHS.map((m, i) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => { setViewMonth(i); setHeaderMenu(""); }}
+                    className={`block w-full rounded-md px-3 py-1.5 text-left text-[13px] transition-colors ${
+                      i === viewMonth ? "bg-[#054B70]/5 font-semibold text-[#054B70]" : "text-gray-950 hover:bg-gray-100"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+            {headerMenu === "year" && (
+              <div className="absolute left-24 top-9 z-10 max-h-52 w-24 overflow-y-auto rounded-lg bg-white p-1 shadow-lg ring-1 ring-gray-950/10">
+                {Array.from({ length: 21 }, (_, i) => today.getFullYear() - 10 + i).map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => { setViewYear(y); setHeaderMenu(""); }}
+                    className={`block w-full rounded-md px-3 py-1.5 text-left text-[13px] transition-colors ${
+                      y === viewYear ? "bg-[#054B70]/5 font-semibold text-[#054B70]" : "text-gray-950 hover:bg-gray-100"
+                    }`}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex">
               <button
                 type="button"
@@ -250,17 +337,21 @@ export default function DatePicker({
               const isSelected = dStr === datePart;
               const isToday = dStr === todayStr;
               const disallowed = !!allowedWeekdays && !allowedWeekdays.includes(d.getDay());
+              const hol = holidayName(d);
               return (
                 <button
                   key={dStr}
                   type="button"
                   disabled={disallowed}
                   onClick={() => pickDay(d)}
+                  title={hol || undefined}
                   className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[13px] transition duration-75 ${
                     isSelected
                       ? "bg-[#054B70] font-medium text-white"
                       : disallowed
                       ? "cursor-not-allowed text-gray-300"
+                      : hol && inMonth
+                      ? "font-medium text-amber-600 hover:bg-amber-50"
                       : isToday
                       ? "font-medium text-[#054B70] hover:bg-gray-100"
                       : inMonth
