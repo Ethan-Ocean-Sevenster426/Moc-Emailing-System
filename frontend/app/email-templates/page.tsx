@@ -298,9 +298,11 @@ function EmailTemplatesPageInner() {
 
   // "Start campaign flow" — no questions asked: launch now with the campaign's
   // default audience (touchpoint 1 immediately, the rest after their waits).
+  const [confirmStart, setConfirmStart] = useState(false);
+  const [startBusy, setStartBusy] = useState(false);
+
   async function startFlowNow() {
-    const who = campaignAudience ? ` to ${campaignAudience}` : " to all active contacts";
-    if (!confirm(`Start "${campaignName || "this campaign"}" now?\n\nTouchpoint 1 goes out immediately${who}; each next touchpoint follows after its own wait. Each run sends to at most 500 contacts.`)) return;
+    setStartBusy(true);
     try {
       const res = await fetch(`${API}/schedules/schedule-campaign/`, {
         method: "POST",
@@ -310,10 +312,12 @@ function EmailTemplatesPageInner() {
       });
       const data = await res.json();
       if (data.ok) {
+        setConfirmStart(false);
         notifyBoard(`Flow started — ${data.scheduled} email${data.scheduled === 1 ? "" : "s"} on the journey${data.skipped ? ` (${data.skipped} empty skipped)` : ""}. Track it on Send Progress.`);
         fetchBoard();
       } else notifyBoard(data.error || "Could not start");
     } catch { notifyBoard("Could not start"); }
+    setStartBusy(false);
   }
 
   async function submitScheduleFlow() {
@@ -1153,7 +1157,7 @@ function EmailTemplatesPageInner() {
               <>
                 {board.length > 0 && (
                   <button
-                    onClick={startFlowNow}
+                    onClick={() => setConfirmStart(true)}
                     className="btn-press flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-green-700 sm:px-4"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" /></svg>
@@ -2357,6 +2361,37 @@ function EmailTemplatesPageInner() {
                 {addBusy ? "Adding…" : "Add email"}
               </button>
               <button onClick={() => setShowAddTp(false)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Start the flow now — proper confirm dialog (touchpoint 1 immediately, rest after waits) */}
+      {confirmStart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setConfirmStart(false)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={SPRING} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-500/15">
+                <svg className="h-5 w-5 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" /></svg>
+              </span>
+              <h2 className="text-[16px] font-bold text-gray-950">Start {campaignName ? `"${campaignName}"` : "this campaign"} now?</h2>
+            </div>
+            <p className="mb-2 text-[13px] text-gray-700">
+              Touchpoint 1 goes out immediately to <span className="font-semibold text-gray-950">{campaignAudience || "all active contacts"}</span>; each next touchpoint follows after its own wait.
+            </p>
+            <p className="mb-5 text-[12px] text-gray-500">
+              Each run sends to at most 500 contacts — the rest stay eligible for the next run. Track everything on Send Progress.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmStart(false)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>
+              <button
+                onClick={startFlowNow}
+                disabled={startBusy}
+                className="btn-press flex items-center gap-2 rounded-lg bg-green-600 px-6 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" /></svg>
+                {startBusy ? "Starting…" : "Start sending"}
+              </button>
             </div>
           </motion.div>
         </div>
