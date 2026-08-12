@@ -2443,11 +2443,13 @@ function EmailTemplatesPageInner() {
                     <p className="text-[12px] text-gray-500">
                       Combine units freely — e.g. 1 week and 3 days. The time pins the clock in the timezone you pick.
                     </p>
-                    <label className="mb-1 mt-3 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
-                    <DatePicker value={addDate} onChange={setAddDate} placeholder="Pick a date…" className="mb-1 w-52" />
-                    <p className="text-[12px] text-gray-500">
-                      A date here overrides the wait — the email goes out on that day (at the &quot;Then send at&quot; time if set, SAST).
-                    </p>
+                    <div className="mt-5 border-t border-gray-200 pt-4">
+                      <label className="mb-1.5 block text-[13px] font-medium text-gray-950">Send on a specific date instead (optional)</label>
+                      <DatePicker value={addDate} onChange={setAddDate} placeholder="Pick a date…" className="mb-1.5 w-52" />
+                      <p className="text-[12px] text-gray-500">
+                        Picking a date replaces the wait above — this email goes out on that exact day, at the &quot;Then send at&quot; time if you set one (SAST).
+                      </p>
+                    </div>
                   </>
                 )}
               </fieldset>
@@ -2630,11 +2632,13 @@ function EmailTemplatesPageInner() {
             <p className="mb-3 text-[11px] text-gray-500">
               Pins the clock time in the timezone you pick. Blank = exactly after the wait.
             </p>
-            <label className="mb-1 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
-            <DatePicker value={waitDate} onChange={setWaitDate} placeholder="Pick a date…" className="mb-1 w-52" />
-            <p className="mb-5 text-[11px] text-gray-500">
-              A date here overrides the wait — this email goes out on that day (at the &quot;Then send at&quot; time if set, SAST). Use Clear in the calendar to go back to the wait.
-            </p>
+            <div className="mb-5 mt-4 border-t border-gray-200 pt-4">
+              <label className="mb-1.5 block text-[13px] font-medium text-gray-950">Send on a specific date instead (optional)</label>
+              <DatePicker value={waitDate} onChange={setWaitDate} placeholder="Pick a date…" className="mb-1.5 w-52" />
+              <p className="text-[11px] text-gray-500">
+                Picking a date replaces the wait above — this email goes out on that exact day, at the &quot;Then send at&quot; time if you set one (SAST). Use Clear in the calendar to go back to the wait.
+              </p>
+            </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setWaitTp(null)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>
               <button onClick={saveWait} className="btn-press rounded-lg bg-[#054B70] px-6 py-2.5 text-[12px] font-bold text-white">Save</button>
