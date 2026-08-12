@@ -1265,7 +1265,7 @@ function EmailTemplatesPageInner() {
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-[14px] font-extrabold text-blue-700">
                               {n}
                             </span>
-                            {renameTp === n ? (
+                            {renameTp === n && activeTP === null ? (
                               <div className="min-w-0 flex-1">
                                 <input
                                   autoFocus
@@ -1303,12 +1303,12 @@ function EmailTemplatesPageInner() {
                                 </span>
                               </button>
                             )}
-                            {renameTp !== n && (configured ? (
+                            {(renameTp !== n || activeTP !== null) && (configured ? (
                               <span className="shrink-0 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-700">Ready</span>
                             ) : (
                               <span className="shrink-0 rounded-full bg-gray-400/15 px-2 py-0.5 text-[10px] font-semibold text-gray-500">Empty</span>
                             ))}
-                            {renameTp !== n && canEdit && (
+                            {(renameTp !== n || activeTP !== null) && canEdit && (
                               <div className="flex shrink-0 gap-1.5">
                                 <button
                                   type="button"
@@ -1425,7 +1425,7 @@ function EmailTemplatesPageInner() {
                                     >
                                       Opted out{bt.optouts > 0 ? ` · ${bt.optouts}` : ""}
                                     </button>
-                                    {renameTp === bt.goodbye.test_number ? (
+                                    {renameTp === bt.goodbye.test_number && activeTP === null ? (
                                       <input
                                         autoFocus
                                         value={renameVal}
