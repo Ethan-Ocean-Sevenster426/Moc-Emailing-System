@@ -63,20 +63,35 @@ const DEFAULT_OPT_OUT_TEXT = "If you'd prefer not to receive further communicati
 // Timezones the "Then send at" clock can be entered in. Sends always run on
 // South Africa time — other zones are converted before saving.
 const SA_TZ = "Africa/Johannesburg";
+
+/** Current UTC offset of a zone, e.g. "UTC+2", "UTC−4", "UTC+5:30" (DST-aware). */
+function tzOffsetLabel(zone: string): string {
+  const now = new Date();
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+  const p = Object.fromEntries(dtf.formatToParts(now).map((x) => [x.type, x.value]));
+  const min = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute) - now.getTime()) / 60000);
+  const abs = Math.abs(min);
+  const mm = abs % 60;
+  return `UTC${min >= 0 ? "+" : "−"}${Math.floor(abs / 60)}${mm ? `:${String(mm).padStart(2, "0")}` : ""}`;
+}
+
 const TIMEZONES = [
-  { value: SA_TZ, label: "South Africa (SAST)" },
-  { value: "Europe/London", label: "United Kingdom (London)" },
-  { value: "Europe/Paris", label: "Central Europe (Paris / Berlin)" },
-  { value: "America/New_York", label: "US Eastern (New York)" },
-  { value: "America/Chicago", label: "US Central (Chicago)" },
-  { value: "America/Denver", label: "US Mountain (Denver)" },
-  { value: "America/Los_Angeles", label: "US Pacific (Los Angeles)" },
-  { value: "Asia/Dubai", label: "UAE (Dubai)" },
-  { value: "Asia/Kolkata", label: "India (Mumbai)" },
-  { value: "Asia/Singapore", label: "Singapore / Hong Kong" },
-  { value: "Australia/Sydney", label: "Australia (Sydney)" },
-  { value: "UTC", label: "UTC" },
-];
+  { value: SA_TZ, name: "South Africa (SAST)" },
+  { value: "Europe/London", name: "United Kingdom (London)" },
+  { value: "Europe/Paris", name: "Central Europe (Paris / Berlin)" },
+  { value: "America/New_York", name: "US Eastern (New York)" },
+  { value: "America/Chicago", name: "US Central (Chicago)" },
+  { value: "America/Denver", name: "US Mountain (Denver)" },
+  { value: "America/Los_Angeles", name: "US Pacific (Los Angeles)" },
+  { value: "Asia/Dubai", name: "UAE (Dubai)" },
+  { value: "Asia/Kolkata", name: "India (Mumbai)" },
+  { value: "Asia/Singapore", name: "Singapore / Hong Kong" },
+  { value: "Australia/Sydney", name: "Australia (Sydney)" },
+  { value: "UTC", name: "UTC" },
+].map((t) => ({ value: t.value, label: t.value === "UTC" ? "UTC±0" : `${t.name} · ${tzOffsetLabel(t.value)}` }));
 
 /** Convert an HH:MM wall-clock in `tz` (on dateStr, or today) to the same
  *  instant's HH:MM in South Africa time — DST-aware via Intl. */
