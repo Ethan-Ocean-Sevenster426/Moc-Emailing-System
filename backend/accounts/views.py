@@ -3532,16 +3532,22 @@ def _run_bulk_send(job_id):
     bounce_thread.start()
 
 
+DEFAULT_SEND_LIMIT = 500  # per-run cap applied when no explicit limit is given
+
+
 def _create_and_start_job(tpl, library_tpl, data, user, send_limit):
     """Create a SendJob for the eligible contacts and start the send thread.
-    Returns (job, total_eligible, batch_size); job is None when nobody is eligible."""
+    Returns (job, total_eligible, batch_size); job is None when nobody is eligible.
+    Without an explicit limit, each run sends to at most DEFAULT_SEND_LIMIT
+    contacts — the rest stay eligible for the next run."""
     contacts = _eligible_contacts_for_send(tpl.touchpoint_number, data, campaign=tpl.campaign)
     contacts = contacts.order_by('id')  # deterministic ordering so "next N" is consistent
     total_eligible = contacts.count()
     if total_eligible == 0:
         return None, 0, 0
 
-    contact_list = list(contacts[:send_limit] if send_limit > 0 else contacts)
+    cap = send_limit if send_limit and send_limit > 0 else DEFAULT_SEND_LIMIT
+    contact_list = list(contacts[:cap])
 
     # Remember who this run targeted, for the history cards ("to …")
     target_parts = []

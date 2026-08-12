@@ -296,6 +296,26 @@ function EmailTemplatesPageInner() {
     setShowScheduleFlow(true);
   }
 
+  // "Start campaign flow" — no questions asked: launch now with the campaign's
+  // default audience (touchpoint 1 immediately, the rest after their waits).
+  async function startFlowNow() {
+    const who = campaignAudience ? ` to ${campaignAudience}` : " to all active contacts";
+    if (!confirm(`Start "${campaignName || "this campaign"}" now?\n\nTouchpoint 1 goes out immediately${who}; each next touchpoint follows after its own wait. Each run sends to at most 500 contacts.`)) return;
+    try {
+      const res = await fetch(`${API}/schedules/schedule-campaign/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign_id: campaignId || undefined, when: "now" }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        notifyBoard(`Flow started — ${data.scheduled} email${data.scheduled === 1 ? "" : "s"} on the journey${data.skipped ? ` (${data.skipped} empty skipped)` : ""}. Track it on Send Progress.`);
+        fetchBoard();
+      } else notifyBoard(data.error || "Could not start");
+    } catch { notifyBoard("Could not start"); }
+  }
+
   async function submitScheduleFlow() {
     if (!schStartAt) return;
     setSchBusy(true);
@@ -1133,10 +1153,7 @@ function EmailTemplatesPageInner() {
               <>
                 {board.length > 0 && (
                   <button
-                    onClick={() => {
-                      const first = board.find((b) => b.has_content)?.touchpoint_number || board[0].touchpoint_number;
-                      setShowBulkSend(first); setBulkResult(null); setBulkGroupId(""); setBulkSegmentIds([]); setBulkTemplateId(""); setBulkLimit("");
-                    }}
+                    onClick={startFlowNow}
                     className="btn-press flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-green-700 sm:px-4"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" /></svg>
@@ -2759,10 +2776,10 @@ function EmailTemplatesPageInner() {
                   min={1}
                   value={bulkLimit}
                   onChange={(e) => setBulkLimit(e.target.value)}
-                  placeholder={bulkEligible !== null ? `All ${bulkEligible}` : "All"}
+                  placeholder="500"
                   className="w-28 rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px] font-semibold text-gray-900 outline-none focus:border-[#054B70]"
                 />
-                <span className="text-[11px] text-gray-500">contacts (blank = all eligible)</span>
+                <span className="text-[11px] text-gray-500">contacts (blank = first 500 eligible)</span>
               </div>
               {bulkLimit && bulkEligible !== null && Number(bulkLimit) < bulkEligible && (
                 <p className="mt-1.5 text-[10px] font-medium text-[#054B70]">
