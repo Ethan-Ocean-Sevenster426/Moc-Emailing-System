@@ -465,6 +465,18 @@ export default function RichTextEditor({ value, onChange, readOnly = false, edit
           contentEditable={!readOnly}
           suppressContentEditableWarning
           onInput={(e) => onChange((e.target as HTMLDivElement).innerHTML)}
+          onPaste={(e) => {
+            if (readOnly) return;
+            // Pasted HTML *source* (plain text full of tags) should render, not
+            // appear as literal <p>…</p> text. Rich pastes already carry a
+            // text/html flavor and are left to the browser.
+            const html = e.clipboardData.getData("text/html");
+            const text = e.clipboardData.getData("text/plain");
+            if (!html && text && /<([a-z][a-z0-9]*)\b[^>]*>/i.test(text)) {
+              e.preventDefault();
+              document.execCommand("insertHTML", false, text);
+            }
+          }}
           style={{ minHeight }}
           className={`beacon-body-editor w-full bg-white px-4 py-3 text-sm leading-relaxed text-gray-900 outline-none ${
             readOnly ? "cursor-default rounded-xl opacity-70" : "rounded-lg ring-1 ring-gray-950/10"

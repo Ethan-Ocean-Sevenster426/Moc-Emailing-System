@@ -1432,7 +1432,10 @@ function EmailTemplatesPageInner() {
 
                   {/* Email body — rich editor with Beacon's exact toolbar */}
                   <div>
-                    <label className="mb-1.5 block text-[13px] font-medium text-gray-950">Email body</label>
+                    <label className="mb-1 block text-[13px] font-medium text-gray-950">Email body</label>
+                    <p className="mb-1.5 text-[12px] text-gray-500">
+                      Normal text and HTML both work here — type and style with the toolbar, or paste a ready-made HTML email straight in. The live preview shows exactly how it lands.
+                    </p>
                     <RichTextEditor
                       value={current.body_html}
                       onChange={(html) => updateCurrent("body_html", html)}
