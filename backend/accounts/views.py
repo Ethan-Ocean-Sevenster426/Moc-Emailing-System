@@ -1570,12 +1570,18 @@ def campaigns_list(request):
 @require_http_methods(["GET"])
 @require_auth
 def campaigns_detail(request):
-    c = Campaign.objects.select_related('group').filter(id=request.GET.get('id')).first()
+    c = Campaign.objects.select_related('group', 'segment', 'import_group', 'tag').filter(id=request.GET.get('id')).first()
     if not c:
         return JsonResponse({'error': 'Campaign not found'}, status=404)
+    audience_parts = [p for p in [
+        c.import_group.name if c.import_group else '',
+        c.segment.name if c.segment else '',
+        f'#{c.tag.name}' if c.tag else '',
+    ] if p]
     return JsonResponse({'ok': True, 'campaign': {
         'id': c.id, 'name': c.name, 'description': c.description,
         'group_id': c.group_id, 'group_name': c.group.name,
+        'audience': ' · '.join(audience_parts),
     }})
 
 
