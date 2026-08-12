@@ -152,6 +152,14 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Console email mode: emails are printed to the server console instead of
+# being sent (no AWS calls, no cost). Auto-enabled when SES credentials are
+# blank; force with EMAIL_CONSOLE_MODE=True / disable with =False.
+EMAIL_CONSOLE_MODE = os.getenv(
+    'EMAIL_CONSOLE_MODE',
+    'True' if not os.getenv('AWS_SES_ACCESS_KEY_ID', '') else 'False',
+) == 'True'
+
 # AWS SES
 AWS_SES_ACCESS_KEY_ID = os.getenv('AWS_SES_ACCESS_KEY_ID', '')
 AWS_SES_SECRET_ACCESS_KEY = os.getenv('AWS_SES_SECRET_ACCESS_KEY', '')

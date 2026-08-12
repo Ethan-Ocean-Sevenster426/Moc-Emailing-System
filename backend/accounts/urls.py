@@ -42,9 +42,57 @@ urlpatterns = [
     path("contacts/bulk-update/", views.contacts_bulk_update, name="contacts_bulk_update"),
     path("contacts/delete/", views.contacts_delete, name="contacts_delete"),
     path("contacts/import/", views.contacts_import_csv, name="contacts_import"),
+    path("contacts/import/preview/", views.contacts_import_preview, name="contacts_import_preview"),
     path("contacts/export/", views.contacts_export_csv, name="contacts_export"),
     path("segments/create/", views.segments_create, name="segments_create"),
     path("segments/update/", views.segments_update, name="segments_update"),
+
+    # Opt-out pending approvals + reactivation history
+    path("contacts/pending-approvals/", views.pending_approvals_list, name="pending_approvals_list"),
+    path("contacts/pending-approvals/count/", views.pending_approvals_count, name="pending_approvals_count"),
+    path("contacts/pending-approvals/decide/", views.pending_approvals_decide, name="pending_approvals_decide"),
+    path("contacts/reactivation-history/", views.reactivation_history, name="reactivation_history"),
+
+    # Custom contact fields
+    path("contacts/custom-fields/", views.custom_fields_list, name="custom_fields_list"),
+    path("contacts/custom-fields/create/", views.custom_fields_create, name="custom_fields_create"),
+    path("contacts/custom-fields/delete/", views.custom_fields_delete, name="custom_fields_delete"),
+
+    # Campaign groups & campaigns (group → campaign → flow)
+    path("campaign-groups/", views.campaign_groups_list, name="campaign_groups_list"),
+    path("campaign-groups/create/", views.campaign_groups_create, name="campaign_groups_create"),
+    path("campaign-groups/update/", views.campaign_groups_update, name="campaign_groups_update"),
+    path("campaign-groups/delete/", views.campaign_groups_delete, name="campaign_groups_delete"),
+    path("campaigns/", views.campaigns_list, name="campaigns_list"),
+    path("campaigns/detail/", views.campaigns_detail, name="campaigns_detail"),
+    path("campaigns/create/", views.campaigns_create, name="campaigns_create"),
+    path("campaigns/update/", views.campaigns_update, name="campaigns_update"),
+    path("campaigns/delete/", views.campaigns_delete, name="campaigns_delete"),
+
+    # Campaign flow board, goodbyes, flow templates
+    path("flow/board/", views.flow_board, name="flow_board"),
+    path("flow/wait/save/", views.flow_wait_save, name="flow_wait_save"),
+    path("flow/touchpoint/clear/", views.flow_touchpoint_clear, name="flow_touchpoint_clear"),
+    path("flow/touchpoint/add/", views.flow_touchpoint_add, name="flow_touchpoint_add"),
+    path("flow/touchpoint/delete/", views.flow_touchpoint_delete, name="flow_touchpoint_delete"),
+    path("flow/goodbye/", views.goodbye_get, name="goodbye_get"),
+    path("flow/goodbye/save/", views.goodbye_save, name="goodbye_save"),
+    path("flow/goodbye/delete/", views.goodbye_delete, name="goodbye_delete"),
+    path("flow/templates/", views.flow_templates_list, name="flow_templates_list"),
+    path("flow/templates/save/", views.flow_templates_save, name="flow_templates_save"),
+    path("flow/templates/apply/", views.flow_templates_apply, name="flow_templates_apply"),
+    path("flow/templates/delete/", views.flow_templates_delete, name="flow_templates_delete"),
+
+    # Scheduled sends ('Coming up')
+    path("schedules/", views.schedules_list, name="schedules_list"),
+    path("schedules/schedule-campaign/", views.schedules_schedule_campaign, name="schedules_schedule_campaign"),
+    path("schedules/batch/run-now/", views.schedules_batch_run_now, name="schedules_batch_run_now"),
+    path("schedules/batch/edit/", views.schedules_batch_edit, name="schedules_batch_edit"),
+    path("schedules/batch/cancel/", views.schedules_batch_cancel, name="schedules_batch_cancel"),
+    path("schedules/create/", views.schedules_create, name="schedules_create"),
+    path("schedules/update/", views.schedules_update, name="schedules_update"),
+    path("schedules/cancel/", views.schedules_cancel, name="schedules_cancel"),
+    path("schedules/run-now/", views.schedules_run_now, name="schedules_run_now"),
 
     # Reusable template library
     path("templates-library/", views.templates_library_list, name="templates_library_list"),
@@ -58,11 +106,13 @@ urlpatterns = [
     # Reporting
     path("reporting/stats/", views.reporting_stats, name="reporting_stats"),
     path("reporting/drilldown/", views.reporting_drilldown, name="reporting_drilldown"),
+    path("reporting/touchpoint/", views.reporting_touchpoint, name="reporting_touchpoint"),
 
     # Bulk send / progress
     path("send/start/", views.send_bulk_start, name="send_bulk_start"),
     path("send/eligible-count/", views.send_eligible_count, name="send_eligible_count"),
     path("send/progress/", views.send_job_progress, name="send_job_progress"),
+    path("send/report/", views.send_job_report, name="send_job_report"),
     path("send/cancel/", views.send_job_cancel, name="send_job_cancel"),
     path("send/check-bounces/", views.check_bounces, name="check_bounces"),
 

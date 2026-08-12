@@ -28,7 +28,7 @@ export function useAuth(requiredRole?: string | string[]) {
         if (requiredRole) {
           const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
           if (!roles.includes(data.role)) {
-            router.replace("/email-templates");
+            router.replace("/campaign-groups");
             return;
           }
         }

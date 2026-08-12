@@ -32,7 +32,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        router.push("/email-templates");
+        router.push("/campaign-groups");
       } else {
         setError(data.error || "Login failed");
       }
@@ -75,32 +75,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f0f4f7]">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100">
       <div className="w-full max-w-[420px] animate-fade-in-up">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#054B70] shadow-lg shadow-[#054B70]/20">
-            <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-              <polyline points="22,6 12,13 2,6" />
-            </svg>
-          </div>
-          <h1 className="text-[20px] font-bold text-[#0a2a3c]">Magnum Opus Consultants</h1>
-          <p className="mt-1 text-[13px] text-[#8ca3b3]">Email Management System</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/moc-logo-light.png"
+            alt="Magnum Opus Consultants"
+            className="moc-logo mx-auto mb-4 h-12 w-auto"
+          />
+          <p className="mt-1 text-[13px] text-gray-500">Email Management System</p>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl bg-white p-8 shadow-sm">
+        <div className="rounded-xl bg-white p-8 shadow-sm ring-1 ring-gray-950/5">
 
           {/* ── STEP 1: Credentials ── */}
           {step === "credentials" && (
             <form onSubmit={handleLogin} className="animate-fade-in">
-              <h2 className="mb-1 text-[16px] font-bold text-[#0a2a3c]">Sign In</h2>
-              <p className="mb-6 text-[13px] text-[#8ca3b3]">Enter your credentials to continue</p>
+              <h2 className="mb-1 text-[16px] font-bold text-gray-900">Sign In</h2>
+              <p className="mb-6 text-[13px] text-gray-500">Enter your credentials to continue</p>
 
               <div className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">
+                  <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-gray-500">
                     Email
                   </label>
                   <input
@@ -109,12 +108,12 @@ export default function LoginPage() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="you@moc-pty.com"
-                    className="input-glow w-full rounded-xl border border-[#d0dce4] bg-[#f7f9fb] px-4 py-3 text-sm text-[#0a2a3c] placeholder-[#b0c4d0] outline-none"
+                    className="input-glow w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">
+                  <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-gray-500">
                     Password
                   </label>
                   <input
@@ -123,13 +122,13 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="input-glow w-full rounded-xl border border-[#d0dce4] bg-[#f7f9fb] px-4 py-3 text-sm text-[#0a2a3c] placeholder-[#b0c4d0] outline-none"
+                    className="input-glow w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none"
                   />
                 </div>
               </div>
 
               {error && (
-                <div className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-[13px] font-medium text-red-600">
+                <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-[13px] font-medium text-red-600">
                   <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -140,7 +139,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-press mt-6 w-full rounded-xl bg-[#054B70] py-3 text-[14px] font-bold text-white disabled:opacity-50"
+                className="btn-press mt-6 w-full rounded-lg bg-[#054B70] py-3 text-[14px] font-bold text-white disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -165,7 +164,7 @@ export default function LoginPage() {
                 </button>
                 <Link
                   href="/set-password?purpose=setup"
-                  className="text-[12px] font-medium text-[#8ca3b3] hover:text-[#054B70] hover:underline"
+                  className="text-[12px] font-medium text-gray-500 hover:text-[#054B70] hover:underline"
                 >
                   Set up account
                 </Link>
@@ -179,7 +178,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={backToLogin}
-                className="mb-4 flex items-center gap-1.5 text-[12px] font-medium text-[#8ca3b3] transition-colors hover:text-[#054B70]"
+                className="mb-4 flex items-center gap-1.5 text-[12px] font-medium text-gray-500 transition-colors hover:text-[#054B70]"
               >
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path d="M15 19l-7-7 7-7" />
@@ -187,13 +186,13 @@ export default function LoginPage() {
                 Back to login
               </button>
 
-              <h2 className="mb-1 text-[16px] font-bold text-[#0a2a3c]">Reset Password</h2>
-              <p className="mb-6 text-[13px] text-[#8ca3b3]">
+              <h2 className="mb-1 text-[16px] font-bold text-gray-900">Reset Password</h2>
+              <p className="mb-6 text-[13px] text-gray-500">
                 Enter your email address and we&apos;ll send you a reset code.
               </p>
 
               <div>
-                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-gray-500">
                   Email Address
                 </label>
                 <input
@@ -202,12 +201,12 @@ export default function LoginPage() {
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="input-glow w-full rounded-xl border border-[#d0dce4] bg-[#f7f9fb] px-4 py-3 text-sm text-[#0a2a3c] placeholder-[#b0c4d0] outline-none"
+                  className="input-glow w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none"
                 />
               </div>
 
               {error && (
-                <div className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-[13px] font-medium text-red-600">
+                <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-[13px] font-medium text-red-600">
                   <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -218,7 +217,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-press mt-6 w-full rounded-xl bg-[#054B70] py-3 text-[14px] font-bold text-white disabled:opacity-50"
+                className="btn-press mt-6 w-full rounded-lg bg-[#054B70] py-3 text-[14px] font-bold text-white disabled:opacity-50"
               >
                 {loading ? "Sending..." : "Send Reset Code"}
               </button>

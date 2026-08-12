@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Filament-style canvas: light gray ground, near-black ink */
+  --background: #f9fafb;
+  --foreground: #111827;
   --moc-primary: #054B70;
   --moc-primary-dark: #03334e;
   --moc-accent: #94bccc;
@@ -12,15 +13,125 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
+
+/* ── Dark mode ────────────────────────────────────────────────────────────────
+   Toggled by adding .dark to <html> (persisted in localStorage as moc-theme).
+   Implemented as targeted remaps of the app's recurring light-palette
+   utilities, so every page inherits the theme without per-component changes. */
+
+.dark {
+  color-scheme: dark;
+}
+.dark body {
+  background: #0a0e14;
+  color: #e2e8f0;
+}
+
+/* Unlayered on purpose: unlayered CSS outranks Tailwind's layered utilities,
+   and Tailwind v4 would strip unknown selectors inside an @layer block. */
+  /* Surfaces */
+  .dark .bg-gray-50 { background-color: #0a0e14; }
+  .dark .bg-white { background-color: #151b24; }
+  .dark .bg-white\/80 { background-color: rgb(21 27 36 / 0.85); }
+  .dark .bg-gray-100 { background-color: #1e2733; }
+  .dark .hover\:bg-gray-50:hover { background-color: #1b232e; }
+  .dark .hover\:bg-gray-100:hover { background-color: #232e3c; }
+  .dark .bg-black\/30 { background-color: rgb(0 0 0 / 0.6); }
+  .dark .bg-gray-950\/40 { background-color: rgb(0 0 0 / 0.65); }
+
+  /* Ink */
+  .dark .text-gray-950 { color: #e2e8f0; }
+  .dark .text-gray-900 { color: #e2e8f0; }
+  .dark .text-gray-700 { color: #cbd5e1; }
+  .dark .text-gray-600 { color: #a8b3c1; }
+  .dark .text-gray-500 { color: #8b98a9; }
+  .dark .text-gray-400 { color: #64748b; }
+  .dark .text-gray-300 { color: #475569; }
+  .dark .hover\:text-gray-900:hover { color: #f1f5f9; }
+  .dark .hover\:text-gray-700:hover { color: #e2e8f0; }
+  .dark .hover\:text-gray-600:hover { color: #cbd5e1; }
+  .dark .hover\:text-gray-500:hover { color: #a8b3c1; }
+  .dark .placeholder-gray-400::placeholder { color: #52627a; }
+
+  /* Lines & rings */
+  .dark .border-gray-100 { border-color: rgb(255 255 255 / 0.06); }
+  .dark .border-gray-200 { border-color: rgb(255 255 255 / 0.09); }
+  .dark .border-gray-300 { border-color: rgb(255 255 255 / 0.14); }
+  .dark .ring-gray-950\/5 { --tw-ring-color: rgb(255 255 255 / 0.07); }
+  .dark .ring-gray-950\/10 { --tw-ring-color: rgb(255 255 255 / 0.12); }
+  .dark .hover\:ring-gray-950\/20:hover { --tw-ring-color: rgb(255 255 255 / 0.2); }
+  .dark .border-gray-400\/25 { border-color: rgb(148 163 184 / 0.2); }
+  .dark .border-gray-400\/40 { border-color: rgb(148 163 184 / 0.3); }
+
+  /* Brand navy: too dark as text on dark ground — lift it */
+  .dark .text-\[\#054B70\] { color: #6db3da; }
+  .dark .hover\:text-\[\#054B70\]:hover { color: #8cc5e4; }
+  .dark .bg-\[\#054B70\]\/5 { background-color: rgb(109 179 218 / 0.1); }
+  .dark .bg-\[\#054B70\]\/8 { background-color: rgb(109 179 218 / 0.12); }
+  .dark .hover\:bg-\[\#054B70\]\/5:hover { background-color: rgb(109 179 218 / 0.12); }
+  .dark .bg-\[\#94bccc\]\/20 { background-color: rgb(109 179 218 / 0.16); }
+
+  /* Pastel status tints → translucent glows */
+  .dark .bg-emerald-50 { background-color: rgb(16 185 129 / 0.13); }
+  .dark .bg-green-50 { background-color: rgb(34 197 94 / 0.13); }
+  .dark .bg-amber-50 { background-color: rgb(245 158 11 / 0.13); }
+  .dark .bg-red-50 { background-color: rgb(239 68 68 / 0.13); }
+  .dark .hover\:bg-red-50:hover { background-color: rgb(239 68 68 / 0.16); }
+  .dark .hover\:bg-rose-50:hover { background-color: rgb(244 63 94 / 0.16); }
+  .dark .bg-blue-50 { background-color: rgb(59 130 246 / 0.13); }
+  .dark .bg-purple-50 { background-color: rgb(168 85 247 / 0.13); }
+  .dark .bg-teal-50 { background-color: rgb(20 184 166 / 0.13); }
+  .dark .bg-orange-50 { background-color: rgb(249 115 22 / 0.13); }
+  .dark .text-emerald-700 { color: #34d399; }
+  .dark .text-emerald-600 { color: #34d399; }
+  .dark .text-green-700 { color: #4ade80; }
+  .dark .text-amber-700 { color: #fbbf24; }
+  .dark .text-amber-600 { color: #fbbf24; }
+  .dark .text-yellow-700 { color: #facc15; }
+  .dark .text-red-600 { color: #f87171; }
+  .dark .text-red-700 { color: #f87171; }
+  .dark .text-red-500 { color: #f87171; }
+  .dark .text-blue-700 { color: #60a5fa; }
+  .dark .text-blue-600 { color: #60a5fa; }
+  .dark .text-purple-600 { color: #c084fc; }
+  .dark .text-orange-600 { color: #fb923c; }
+  .dark .text-teal-600 { color: #2dd4bf; }
+  .dark .text-gray-600.dark-keep { color: inherit; }
+
+  /* Native <select> popup menus: options inherit tinted backgrounds from the
+     styled field (e.g. the status pills), which reads badly — pin the menu to
+     plain surface colors in each theme instead. */
+  select option {
+    background-color: #ffffff;
+    color: #111827;
+  }
+  .dark select { color-scheme: dark; }
+  .dark select option {
+    background-color: #151b24;
+    color: #e2e8f0;
+  }
+  .dark select option:checked,
+  .dark select option:hover {
+    background-color: #1e2733;
+  }
+
+  /* Brand logo: white-out on dark backgrounds */
+  .dark .moc-logo { filter: brightness(0) invert(1); }
+
+  /* Skeleton shimmer */
+  .dark .from-gray-100 { --tw-gradient-from: #1a2230; }
+  .dark .to-gray-100 { --tw-gradient-to: #1a2230; }
+  .dark .via-white { --tw-gradient-via: #212b3a; }
 
 /* ── Mailchimp-style animations ── */
 
@@ -125,3 +236,16 @@ body {
   border-color: var(--moc-primary);
   box-shadow: 0 0 0 3px rgba(5, 75, 112, 0.1);
 }
+
+/* Rich email-body editor content (Beacon RichEditor look) — also used by the live preview.
+   Unlayered so Tailwind's preflight reset doesn't strip the formatting. */
+.beacon-body-editor h2 { font-size: 1.35em; font-weight: 700; margin: 0.6em 0 0.35em; }
+.beacon-body-editor h3 { font-size: 1.15em; font-weight: 600; margin: 0.5em 0 0.3em; }
+.beacon-body-editor ul { list-style: disc; padding-left: 1.5em; margin: 0.4em 0; }
+.beacon-body-editor ol { list-style: decimal; padding-left: 1.5em; margin: 0.4em 0; }
+.beacon-body-editor blockquote { border-left: 3px solid rgba(120, 120, 120, 0.35); padding-left: 0.8em; margin: 0.5em 0; color: rgb(107, 114, 128); }
+.beacon-body-editor pre { background: rgba(120, 120, 120, 0.12); border-radius: 0.4em; padding: 0.6em 0.8em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; white-space: pre-wrap; margin: 0.5em 0; }
+.beacon-body-editor a { color: #054b70; text-decoration: underline; }
+.beacon-body-editor table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }
+.beacon-body-editor img { max-width: 100%; height: auto; }
+.dark .beacon-body-editor a { color: #6db3da; }

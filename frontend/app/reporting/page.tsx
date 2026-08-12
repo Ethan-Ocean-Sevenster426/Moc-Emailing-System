@@ -1,755 +1,631 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Sidebar from "../components/Sidebar";
 import MainContent from "../components/MainContent";
 import MobileMenuButton from "../components/MobileMenuButton";
+import Select from "../components/Select";
 import { useAuth } from "../hooks/useAuth";
 
 const API = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
-interface Overview {
-  total_jobs: number;
-  total_sent: number;
-  total_failed: number;
-  total_skipped: number;
-  total_recipients: number;
-  delivery_rate: number;
+interface Stats {
+  results: {
+    people_reached: number;
+    emails_per_person: number;
+    added: number;
+    lost: number;
+    window_label: string;
+    weeks: { added: number; lost: number }[];
+    grade: string;
+    hard_rate: number;
+    opt_rate: number;
+  };
+  by_campaign: { id: number; name: string; sent: number; failed: number }[];
+  scorecard: {
+    id: number; name: string; automated: boolean; touchpoints: number; sent: number;
+    rate: number | null; soft: number; hard: number; optouts: number; upcoming: number; last_at: string | null;
+  }[];
+  funnel: { campaign: string; auto: boolean; steps: { n: number; count: number; pct: number }[] } | null;
+  audience_groups: { name: string; count: number }[];
+  optouts: {
+    total: number;
+    with_reason: number;
+    by_org: { org: string; count: number }[];
+    recent: { email: string; contact_name: string; org_name: string; reason: string; at: string }[];
+  };
+  weekday_split: {
+    weekday: { sent: number; failed: number; rate: number };
+    weekend: { sent: number; failed: number; rate: number };
+    days: { day: string; sent: number; failed: number; rate: number }[];
+  };
+  bounces: {
+    hard: number; soft: number; other: number;
+    reasons: { kind: string; reason: string; count: number }[];
+    dead_addresses: { email: string; org_name: string; updated_at: string }[];
+    dead_total: number;
+  };
+  overview: { total_jobs: number; total_sent: number; total_failed: number; total_skipped: number; total_recipients: number; delivery_rate: number };
+  contacts: { total: number; active: number; inactive: number; bounced: number; opted_out: number; undeliverable: number; moved_to_hubspot: number };
+  touchpoints: { touchpoint_number: number; sent?: number; failed?: number; total_jobs?: number; recipients?: number }[];
+  recent_jobs: { id: number; touchpoint_number: number; status: string; sent_count: number; failed_count: number; created_at: string }[];
+  daily_chart: { date: string; sent: number; failed: number; rate: number }[];
+  positive_replies: number;
 }
 
-interface ContactStats {
-  total: number;
-  active: number;
-  inactive: number;
-  bounced: number;
-  opted_out: number;
-  undeliverable: number;
-  moved_to_hubspot: number;
-}
-
-interface TPStat {
-  touchpoint_number: number;
-  total_jobs: number;
-  sent: number;
-  failed: number;
-  skipped: number;
-  recipients: number;
-  delivery_rate: number;
-  last_sent: string | null;
-  last_status: string | null;
-}
-
-interface RecentJob {
-  id: number;
-  touchpoint_number: number;
-  status: string;
-  total_recipients: number;
-  sent_count: number;
-  failed_count: number;
-  skipped_count: number;
-  started_by: string;
-  is_test: boolean;
-  created_at: string;
-  completed_at: string | null;
-}
-
-interface DailyPoint {
-  date: string;
-  sent: number;
-  failed: number;
-  rate: number;
-}
-
-interface DrilldownRecord {
-  id: number;
-  email: string;
-  contact_name: string;
-  org_name: string;
-  status: string;
-  error: string;
-  touchpoint_number: number;
-  job_id: number;
-  sent_at: string | null;
-  job_created_at: string;
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  completed: "bg-emerald-50 text-emerald-700",
-  running: "bg-blue-50 text-blue-700",
-  pending: "bg-amber-50 text-amber-700",
-  cancelled: "bg-gray-100 text-gray-500",
-  failed: "bg-red-50 text-red-600",
+const GRADE_WORDS: Record<string, string> = {
+  A: "Excellent", B: "Good", C: "Fair", D: "Needs work", F: "Poor",
 };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+function shortDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+function dateTime(iso: string) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
 }
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+/** A Beacon/Filament report section: heading, gray description, content. */
+function Section({ heading, description, children }: { heading: React.ReactNode; description?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5">
+      <div className="border-b border-gray-950/5 px-6 py-4">
+        <h2 className="text-[15px] font-semibold text-gray-950">{heading}</h2>
+        {description && <p className="mt-0.5 text-[12px] text-gray-500">{description}</p>}
+      </div>
+      <div className="p-6">{children}</div>
+    </section>
+  );
 }
 
-interface ImportGroupOption {
-  id: number;
-  name: string;
-}
+const MINI = "mb-2 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400";
 
-interface SegmentStat {
-  id: number;
-  name: string;
-  group_name: string;
-  contacts: number;
-  active: number;
-  sent: number;
-  moved_to_hubspot: number;
-  undeliverable: number;
-  opted_out: number;
-}
-
-export default function ReportingPage() {
+function ReportingPageInner() {
   const { loading: authLoading } = useAuth();
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [contacts, setContacts] = useState<ContactStats | null>(null);
-  const [touchpoints, setTouchpoints] = useState<TPStat[]>([]);
-  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
-  const [dailyChart, setDailyChart] = useState<DailyPoint[]>([]);
-  const [segments, setSegments] = useState<SegmentStat[]>([]);
+  const searchParams = useSearchParams();
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [campaignFocus, setCampaignFocus] = useState("");
 
-  // Filter state
-  const [importGroups, setImportGroups] = useState<ImportGroupOption[]>([]);
-  const [filterGroup, setFilterGroup] = useState("");
-  const [filterTP, setFilterTP] = useState("");
-  const [filterFrom, setFilterFrom] = useState("");
-  const [filterTo, setFilterTo] = useState("");
-
-  // Drill-down state
-  const [drillType, setDrillType] = useState<string | null>(null);
-  const [drillRecords, setDrillRecords] = useState<DrilldownRecord[]>([]);
-  const [drillTotal, setDrillTotal] = useState(0);
-  const [drillPage, setDrillPage] = useState(1);
-  const [drillPages, setDrillPages] = useState(1);
-  const [drillLoading, setDrillLoading] = useState(false);
-
-  function fetchStats(group = filterGroup, tp = filterTP, from = filterFrom, to = filterTo) {
-    setLoaded(false);
-    const params = new URLSearchParams();
-    if (group) params.set("import_group", group);
-    if (tp) params.set("touchpoint", tp);
-    if (from) params.set("date_from", from);
-    if (to) params.set("date_to", to);
-    const qs = params.toString();
-    fetch(`${API}/reporting/stats/${qs ? `?${qs}` : ""}`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.ok) {
-          setOverview(data.overview);
-          setContacts(data.contacts);
-          setTouchpoints(data.touchpoints);
-          setRecentJobs(data.recent_jobs);
-          setDailyChart(data.daily_chart);
-          if (data.import_groups) setImportGroups(data.import_groups);
-          if (data.segments) setSegments(data.segments);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoaded(true));
-  }
-
-  useEffect(() => {
-    fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchStats = useCallback(async (campaignId?: string) => {
+    try {
+      const qs = campaignId ? `?campaign_id=${campaignId}` : "";
+      const res = await fetch(`${API}/reporting/stats/${qs}`, { credentials: "include" });
+      const data = await res.json();
+      if (data.ok) setStats(data);
+    } catch { /* */ }
+    setLoaded(true);
   }, []);
 
-  async function openDrilldown(type: string, page = 1) {
-    setDrillType(type);
-    setDrillPage(page);
-    setDrillLoading(true);
-    try {
-      const res = await fetch(`${API}/reporting/drilldown/?type=${type}&page=${page}`, { credentials: "include" });
-      const data = await res.json();
-      if (data.ok) {
-        setDrillRecords(data.records);
-        setDrillTotal(data.total);
-        setDrillPages(data.pages);
-      }
-    } catch { /* */ }
-    setDrillLoading(false);
-  }
-
-  function closeDrilldown() {
-    setDrillType(null);
-    setDrillRecords([]);
-    setDrillTotal(0);
-  }
+  // ?campaign_id= (e.g. from a send's "See the full report" link) scopes the report
+  useEffect(() => {
+    const cid = searchParams.get("campaign_id") || "";
+    setCampaignFocus(cid);
+    fetchStats(cid || undefined);
+  }, [searchParams, fetchStats]);
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f0f4f7]">
-        <div className="flex flex-col items-center gap-3 animate-fade-in">
-          <svg className="h-8 w-8 animate-spin text-[#054B70]" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <svg className="h-8 w-8 animate-spin text-[#054B70]" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
       </div>
     );
   }
 
-  const maxDailySent = dailyChart.length > 0 ? Math.max(...dailyChart.map((d) => d.sent + d.failed), 1) : 1;
+  const r = stats;
+  const kpis = r ? [
+    { label: "Emails sent", value: r.overview.total_sent, color: "#6366f1" },
+    { label: "Arrived safely", value: `${r.overview.delivery_rate}%`, color: "#10b981" },
+    { label: "People you can email", value: r.contacts.active, color: "#0ea5e9" },
+    { label: "Opted out", value: r.contacts.opted_out, color: "#f59e0b" },
+    { label: "Became leads", value: r.positive_replies, color: "#3b82f6" },
+  ] : [];
 
-  const DRILL_LABELS: Record<string, { title: string; color: string; bg: string }> = {
-    sent: { title: "Sent Emails", color: "text-[#054B70]", bg: "bg-[#054B70]/10" },
-    failed: { title: "Failed Emails", color: "text-red-600", bg: "bg-red-50" },
-    skipped: { title: "Skipped Emails", color: "text-amber-600", bg: "bg-amber-50" },
-  };
+  // Donut for "Who's in your contact list" via conic-gradient
+  const donutParts = r ? [
+    { label: "Active", value: r.contacts.active, color: "#10b981" },
+    { label: "Inactive", value: r.contacts.inactive, color: "#9ca3af" },
+    { label: "Undeliverable", value: r.contacts.undeliverable, color: "#ef4444" },
+    { label: "Opted out", value: r.contacts.opted_out, color: "#f59e0b" },
+    { label: "Moved to HubSpot", value: r.contacts.moved_to_hubspot, color: "#3b82f6" },
+  ].filter((p) => p.value > 0) : [];
+  const donutTotal = donutParts.reduce((a, p) => a + p.value, 0);
+  let acc = 0;
+  const donutStops = donutParts.map((p) => {
+    const from = (acc / Math.max(donutTotal, 1)) * 360;
+    acc += p.value;
+    const to = (acc / Math.max(donutTotal, 1)) * 360;
+    return `${p.color} ${from}deg ${to}deg`;
+  }).join(", ");
+
+  const last14 = r ? r.daily_chart.slice(-14) : [];
+  const maxDay = Math.max(1, ...last14.map((d) => d.sent + d.failed));
+  const maxCampaign = r ? Math.max(1, ...r.by_campaign.map((c) => c.sent + c.failed)) : 1;
+  const maxWeek = r ? Math.max(1, ...r.results.weeks.map((w) => Math.max(w.added, w.lost))) : 1;
+  const maxGroup = r ? Math.max(1, ...r.audience_groups.map((g) => g.count)) : 1;
+  const allBounces = r ? r.bounces.soft + r.bounces.hard + r.bounces.other : 0;
+  const maxReason = r ? Math.max(1, ...r.bounces.reasons.map((x) => x.count)) : 1;
+
+  const tpRows = r ? r.touchpoints.map((t) => {
+    const sent = t.sent ?? 0;
+    const failed = t.failed ?? 0;
+    const att = sent + failed;
+    return { n: t.touchpoint_number, sent, failed, rate: att ? Math.round((sent / att) * 100) : null };
+  }) : [];
 
   return (
-    <div className="flex min-h-screen bg-[#f0f4f7]">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       <MainContent>
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[#e0e8ee] bg-white/80 px-4 py-3 backdrop-blur-md sm:px-8 sm:py-4">
-          <MobileMenuButton />
-          <div className="min-w-0">
-            <h1 className="text-[16px] font-bold text-[#0a2a3c]">Reporting</h1>
-            <p className="truncate text-[11px] text-[#8ca3b3]">Campaign analytics, delivery metrics, and send history</p>
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-gray-200 bg-white/80 px-4 py-3 backdrop-blur-md sm:px-8 sm:py-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <MobileMenuButton />
+            <div>
+              <h1 className="text-[16px] font-bold text-gray-900">Reporting</h1>
+              <p className="text-[11px] text-gray-500">The client&apos;s results in plain words.</p>
+            </div>
           </div>
         </header>
 
-        {/* Filters */}
-        <div className="border-b border-[#e0e8ee] bg-white px-4 py-3 sm:px-8">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-              Filters
-            </div>
-
-            {/* Import Group */}
-            <select
-              value={filterGroup}
-              onChange={(e) => { setFilterGroup(e.target.value); fetchStats(e.target.value, filterTP, filterFrom, filterTo); }}
-              className="rounded-lg border border-[#d0dce4] bg-[#f7f9fb] px-3 py-1.5 text-[12px] text-[#0a2a3c] outline-none focus:border-[#054B70] focus:ring-1 focus:ring-[#054B70]/20"
-            >
-              <option value="">All Groups</option>
-              {importGroups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-
-            {/* Touchpoint */}
-            <select
-              value={filterTP}
-              onChange={(e) => { setFilterTP(e.target.value); fetchStats(filterGroup, e.target.value, filterFrom, filterTo); }}
-              className="rounded-lg border border-[#d0dce4] bg-[#f7f9fb] px-3 py-1.5 text-[12px] text-[#0a2a3c] outline-none focus:border-[#054B70] focus:ring-1 focus:ring-[#054B70]/20"
-            >
-              <option value="">All Touchpoints</option>
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>Touchpoint {n}</option>
-              ))}
-            </select>
-
-            {/* Date From */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-[#8ca3b3]">From</span>
-              <input
-                type="date"
-                value={filterFrom}
-                onChange={(e) => { setFilterFrom(e.target.value); fetchStats(filterGroup, filterTP, e.target.value, filterTo); }}
-                className="rounded-lg border border-[#d0dce4] bg-[#f7f9fb] px-3 py-1.5 text-[12px] text-[#0a2a3c] outline-none focus:border-[#054B70] focus:ring-1 focus:ring-[#054B70]/20"
-              />
-            </div>
-
-            {/* Date To */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-[#8ca3b3]">To</span>
-              <input
-                type="date"
-                value={filterTo}
-                onChange={(e) => { setFilterTo(e.target.value); fetchStats(filterGroup, filterTP, filterFrom, e.target.value); }}
-                className="rounded-lg border border-[#d0dce4] bg-[#f7f9fb] px-3 py-1.5 text-[12px] text-[#0a2a3c] outline-none focus:border-[#054B70] focus:ring-1 focus:ring-[#054B70]/20"
-              />
-            </div>
-
-            {/* Clear filters */}
-            {(filterGroup || filterTP || filterFrom || filterTo) && (
-              <button
-                onClick={() => { setFilterGroup(""); setFilterTP(""); setFilterFrom(""); setFilterTo(""); fetchStats("", "", "", ""); }}
-                className="btn-press flex items-center gap-1 rounded-lg bg-[#054B70]/5 px-3 py-1.5 text-[11px] font-semibold text-[#054B70] hover:bg-[#054B70]/10 transition-colors"
-              >
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M6 18L18 6M6 6l12 12" /></svg>
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        <main className="p-4 sm:p-8">
-          {!loaded ? (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-32 rounded-2xl bg-gradient-to-r from-[#f0f4f7] via-white to-[#f0f4f7] bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+        <main className="space-y-5 p-4 sm:p-8">
+          {!loaded || !r ? (
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-32 rounded-xl bg-gradient-to-r from-gray-100 via-white to-gray-100 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
               ))}
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* KPI cards — business outcomes */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6 animate-fade-in">
-                {[
-                  { label: "Emails Sent", value: overview?.total_sent ?? 0, sub: `${overview?.total_recipients ?? 0} recipients queued`, icon: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8", color: "text-[#054B70]", bg: "bg-[#054B70]/8", drill: "sent" },
-                  { label: "Delivery Rate", value: `${overview?.delivery_rate ?? 0}%`, sub: `${overview?.total_failed ?? 0} failed`, icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z", color: "text-emerald-600", bg: "bg-emerald-50", drill: null },
-                  { label: "Active Audience", value: contacts?.active ?? 0, sub: `of ${contacts?.total ?? 0} contacts`, icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z", color: "text-[#054B70]", bg: "bg-[#054B70]/8", drill: null },
-                  { label: "Leads → HubSpot", value: contacts?.moved_to_hubspot ?? 0, sub: "moved to CRM", icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6", color: "text-blue-600", bg: "bg-blue-50", drill: null },
-                  { label: "Opt-outs", value: contacts?.opted_out ?? 0, sub: "unsubscribed", icon: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636", color: "text-amber-600", bg: "bg-amber-50", drill: null },
-                  { label: "Undeliverable", value: contacts?.undeliverable ?? 0, sub: "bad addresses", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z", color: "text-orange-600", bg: "bg-orange-50", drill: null },
-                ].map((card) => (
-                  <button
-                    key={card.label}
-                    onClick={() => card.drill && openDrilldown(card.drill)}
-                    className={`group relative overflow-hidden rounded-2xl bg-white p-5 text-left shadow-sm transition-all duration-200 ${
-                      card.drill ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : "cursor-default"
-                    }`}
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.bg}`}>
-                        <svg className={`h-[18px] w-[18px] ${card.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                          <path strokeLinecap="round" strokeLinejoin="round" d={card.icon} />
-                        </svg>
-                      </div>
-                      {card.drill && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-[#c0cdd6] opacity-0 transition-opacity group-hover:opacity-100">View →</span>
-                      )}
+            <>
+              {/* Filter toolbar */}
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-400/20 bg-gray-500/[.03] px-3.5 py-2.5">
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#6b8a9e]">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                  </svg>
+                  Filter
+                </span>
+                <Select
+                  value={campaignFocus}
+                  onChange={(v) => { setCampaignFocus(v); fetchStats(v || undefined); }}
+                  options={[{ value: "", label: "Most active campaign" }, ...r.scorecard.map((c) => ({ value: String(c.id), label: c.name }))]}
+                  size="sm"
+                  className="min-w-[12rem]"
+                />
+              </div>
+
+              {/* 1 · Results at a glance */}
+              <Section
+                heading="Results at a glance"
+                description="The client's results in plain words — how many real people you reached, whether the list is growing, and how healthy it is."
+              >
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">People reached</div>
+                    <div className="mt-1 text-[26px] font-extrabold leading-none text-gray-950 tabular-nums">{r.results.people_reached.toLocaleString()}</div>
+                    <div className="mt-1 text-[12px] text-gray-500">real people got at least one email</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Emails per person</div>
+                    <div className="mt-1 text-[26px] font-extrabold leading-none text-gray-950 tabular-nums">{r.results.emails_per_person}</div>
+                    <div className="mt-1 text-[12px] text-gray-500">on average, per contact reached</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Audience growth ({r.results.window_label})</div>
+                    <div className={`mt-1 text-[26px] font-extrabold leading-none tabular-nums ${r.results.added - r.results.lost >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                      {r.results.added - r.results.lost >= 0 ? "+" : ""}{(r.results.added - r.results.lost).toLocaleString()}
                     </div>
-                    <p className={`text-[26px] font-bold leading-none ${card.color} tabular-nums`}>{card.value}</p>
-                    <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wider text-[#8ca3b3]">{card.label}</p>
-                    <p className="mt-0.5 text-[10px] text-[#b0c4d0]">{card.sub}</p>
-                  </button>
+                    <div className="mt-1 text-[12px] text-gray-500">{r.results.added} added · {r.results.lost} lost</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">List quality</div>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-[26px] font-extrabold leading-none text-gray-950">{r.results.grade}</span>
+                      <span className={`text-[14px] font-bold ${["A", "B"].includes(r.results.grade) ? "text-emerald-700" : r.results.grade === "C" ? "text-amber-700" : "text-red-700"}`}>
+                        {GRADE_WORDS[r.results.grade] || ""}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[12px] text-gray-500">
+                      a health score from A (best) to F — {r.results.hard_rate}% of emails hit dead addresses, {r.results.opt_rate}% of people reached opted out
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <p className={MINI}>Audience added vs lost — last 8 weeks</p>
+                  <div className="flex h-24 items-end gap-2">
+                    {r.results.weeks.map((w, i) => (
+                      <div key={i} className="flex flex-1 items-end justify-center gap-1">
+                        <div className="w-3 rounded-t bg-[#10b981]" style={{ height: `${Math.max(3, (w.added / maxWeek) * 88)}px` }} title={`+${w.added} added`} />
+                        <div className="w-3 rounded-t bg-[#ef4444]" style={{ height: `${Math.max(3, (w.lost / maxWeek) * 88)}px` }} title={`−${w.lost} lost`} />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[12px] text-gray-500">
+                    <span className="font-bold text-[#10b981]">■</span> added&nbsp;&nbsp;
+                    <span className="font-bold text-[#ef4444]">■</span> lost (opted out)
+                  </p>
+                </div>
+              </Section>
+
+              {/* 2 · KPI row */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+                {kpis.map((k) => (
+                  <div key={k.label} className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{k.label}</div>
+                    <div className="mt-1 text-[24px] font-extrabold leading-none tabular-nums" style={{ color: k.color }}>
+                      {typeof k.value === "number" ? k.value.toLocaleString() : k.value}
+                    </div>
+                  </div>
                 ))}
               </div>
 
-              {/* Two-column layout */}
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-
-                {/* Left: Daily Send Volume Chart */}
-                <div className="xl:col-span-2 rounded-2xl bg-white p-6 shadow-sm animate-fade-in-up" style={{ animationDelay: "0.05s" }}>
-                  <div className="mb-5 flex items-center justify-between">
-                    <div>
-                      <h2 className="text-[14px] font-bold text-[#0a2a3c]">Send Volume</h2>
-                      <p className="text-[11px] text-[#8ca3b3]">Daily emails sent over the last 30 days</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-2.5 w-2.5 rounded-full bg-[#054B70]" />
-                        <span className="text-[10px] font-semibold text-[#8ca3b3]">Delivered</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
-                        <span className="text-[10px] font-semibold text-[#8ca3b3]">Failed</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {dailyChart.length === 0 ? (
-                    <div className="flex h-48 items-center justify-center text-[13px] text-[#8ca3b3]">
-                      No send data in the last 30 days
-                    </div>
+              {/* 3 · Who's in your contact list + Emails sent per day */}
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <Section heading="Who's in your contact list" description="Every contact, split by whether you can still email them.">
+                  {donutTotal === 0 ? (
+                    <p className="text-[13px] text-gray-500">No contacts yet.</p>
                   ) : (
-                    <div className="flex items-end gap-1" style={{ height: 180 }}>
-                      {dailyChart.map((d) => {
-                        const sentH = (d.sent / maxDailySent) * 160;
-                        const failedH = (d.failed / maxDailySent) * 160;
-                        return (
-                          <div key={d.date} className="group relative flex flex-1 flex-col items-center justify-end" style={{ minWidth: 0 }}>
-                            {/* Tooltip */}
-                            <div className="pointer-events-none absolute -top-14 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#0a2a3c] px-3 py-2 text-[10px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                              <p className="font-bold">{formatDate(d.date)}</p>
-                              <p>{d.sent} sent, {d.failed} failed ({d.rate}%)</p>
-                            </div>
-                            {/* Bars */}
-                            {d.failed > 0 && (
-                              <div
-                                className="w-full rounded-t-sm bg-red-400 transition-all duration-300"
-                                style={{ height: Math.max(failedH, 2) }}
-                              />
-                            )}
-                            <div
-                              className="w-full rounded-t-sm bg-[#054B70] transition-all duration-300 group-hover:bg-[#0a6a9e]"
-                              style={{ height: Math.max(sentH, 2) }}
-                            />
-                            {/* Date label */}
-                            <span className="mt-1.5 text-[8px] text-[#b0c4d0] truncate w-full text-center">
-                              {new Date(d.date).getDate()}
-                            </span>
+                    <div className="flex flex-wrap items-center gap-6">
+                      <div className="relative h-36 w-36 shrink-0 rounded-full" style={{ background: `conic-gradient(${donutStops})` }}>
+                        <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-white">
+                          <span className="text-[22px] font-extrabold leading-none text-gray-950 tabular-nums">{r.contacts.total.toLocaleString()}</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">contacts</span>
+                        </div>
+                      </div>
+                      <div className="min-w-[180px] flex-1 space-y-1.5">
+                        {donutParts.map((p) => (
+                          <div key={p.label} className="flex items-center gap-2 text-[13px]">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: p.color }} />
+                            <span className="flex-1 text-gray-950">{p.label}</span>
+                            <span className="font-bold tabular-nums">{p.value.toLocaleString()}</span>
+                            <span className="w-11 text-right text-gray-400">{Math.round((p.value / donutTotal) * 100)}%</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: Contact Health */}
-                <div className="rounded-2xl bg-white p-6 shadow-sm animate-fade-in-up" style={{ animationDelay: "0.08s" }}>
-                  <h2 className="text-[14px] font-bold text-[#0a2a3c] mb-1">Contact Health</h2>
-                  <p className="text-[11px] text-[#8ca3b3] mb-5">Status breakdown of your contact list</p>
-
-                  {contacts && (() => {
-                    const pct = (v: number) => (contacts.total > 0 ? (v / contacts.total) * 100 : 0);
-                    const rows = [
-                      { label: "Active", value: contacts.active, color: "bg-emerald-500" },
-                      { label: "Inactive", value: contacts.inactive, color: "bg-gray-400" },
-                      { label: "Undeliverable", value: contacts.undeliverable, color: "bg-orange-400" },
-                      { label: "Opt-out", value: contacts.opted_out, color: "bg-amber-400" },
-                      { label: "Moved to HubSpot", value: contacts.moved_to_hubspot, color: "bg-blue-500" },
-                    ].filter((r) => r.value > 0);
-                    return (
-                    <div className="space-y-4">
-                      {/* Visual bar */}
-                      <div className="flex h-4 w-full overflow-hidden rounded-full bg-[#f0f4f7]">
-                        {contacts.total > 0 && rows.map((r) => (
-                          <div key={r.label} className={`${r.color} transition-all duration-500`} style={{ width: `${pct(r.value)}%` }} title={`${r.label}: ${r.value}`} />
                         ))}
                       </div>
+                    </div>
+                  )}
+                </Section>
 
-                      {/* Breakdown list */}
-                      {rows.map((item) => (
-                        <div key={item.label} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                            <span className="text-[12px] font-medium text-[#4a6a7a]">{item.label}</span>
+                <Section heading="Emails sent per day" description="The last 14 days of sending.">
+                  {last14.length === 0 ? (
+                    <p className="text-[13px] text-gray-500">No sends in the last 14 days.</p>
+                  ) : (
+                    <div className="flex h-36 items-end gap-1.5">
+                      {last14.map((d) => (
+                        <div key={d.date} className="group flex flex-1 flex-col items-center gap-1" title={`${shortDate(d.date)} — ${d.sent} sent, ${d.failed} failed`}>
+                          <div className="flex w-full max-w-6 flex-col justify-end" style={{ height: "116px" }}>
+                            {d.failed > 0 && <div className="w-full rounded-t bg-[#ef4444]" style={{ height: `${(d.failed / maxDay) * 110}px` }} />}
+                            <div className={`w-full bg-[#10b981] ${d.failed > 0 ? "" : "rounded-t"}`} style={{ height: `${Math.max(2, (d.sent / maxDay) * 110)}px` }} />
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-bold text-[#0a2a3c]">{item.value}</span>
-                            <span className="w-8 text-right text-[10px] font-semibold text-[#8ca3b3]">{Math.round(pct(item.value))}%</span>
-                          </div>
+                          <span className="text-[9px] text-gray-400">{shortDate(d.date)}</span>
                         </div>
                       ))}
-
-                      <div className="flex items-center justify-between border-t border-[#f0f4f7] pt-3">
-                        <span className="text-[12px] font-semibold text-[#8ca3b3]">Total contacts</span>
-                        <span className="text-[14px] font-bold text-[#0a2a3c]">{contacts.total}</span>
-                      </div>
                     </div>
-                    );
-                  })()}
-                </div>
+                  )}
+                </Section>
               </div>
 
-              {/* Touchpoint Performance */}
-              {touchpoints.length > 0 && (
-                <div className="rounded-2xl bg-white shadow-sm overflow-hidden animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-                  <div className="px-6 py-5 border-b border-[#f0f4f7]">
-                    <h2 className="text-[14px] font-bold text-[#0a2a3c]">Touchpoint Performance</h2>
-                    <p className="text-[11px] text-[#8ca3b3]">Delivery metrics per touchpoint</p>
+              {/* 4 · Sent by campaign */}
+              <Section heading="Sent by campaign" description="Green = delivered, red = failed.">
+                {r.by_campaign.length === 0 ? (
+                  <p className="text-[13px] text-gray-500">Nothing sent yet.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {r.by_campaign.map((c) => (
+                      <div key={c.id} className="flex items-center gap-3 text-[13px]">
+                        <span className="w-44 shrink-0 truncate font-bold text-[#0369a1]">{c.name}</span>
+                        <div className="flex h-3 flex-1 overflow-hidden rounded-full bg-gray-400/15">
+                          <div className="h-full bg-[#10b981]" style={{ width: `${(c.sent / maxCampaign) * 100}%` }} />
+                          <div className="h-full bg-[#ef4444]" style={{ width: `${(c.failed / maxCampaign) * 100}%` }} />
+                        </div>
+                        <span className="w-24 shrink-0 text-right tabular-nums text-gray-500">
+                          <strong className="text-emerald-700">{c.sent.toLocaleString()}</strong>
+                          {c.failed > 0 && <> · <strong className="text-red-700">{c.failed}</strong></>}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  <table className="w-full text-left">
+                )}
+              </Section>
+
+              {/* 5 · Campaign scorecard */}
+              <Section heading="Campaign scorecard" description={<>The full picture per campaign — sends, arrival rate, bounces, opt-outs and what&apos;s coming up.</>}>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left">
                     <thead>
-                      <tr className="border-b border-[#e8eff3] text-[10px] font-bold uppercase tracking-wider text-[#8ca3b3]">
-                        <th className="px-6 py-3">Touchpoint</th>
-                        <th className="px-6 py-3">Jobs</th>
-                        <th className="px-6 py-3">Recipients</th>
-                        <th className="px-6 py-3">Delivered</th>
-                        <th className="px-6 py-3">Failed</th>
-                        <th className="px-6 py-3">Delivery Rate</th>
-                        <th className="px-6 py-3">Last Sent</th>
-                        <th className="px-6 py-3">Status</th>
+                      <tr className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        <th className="px-2 py-2">Campaign</th>
+                        <th className="px-2 py-2 text-right">Sent</th>
+                        <th className="px-2 py-2 text-right">Arrival rate</th>
+                        <th className="px-2 py-2 text-right">Soft</th>
+                        <th className="px-2 py-2 text-right">Hard</th>
+                        <th className="px-2 py-2 text-right">Opt-outs</th>
+                        <th className="px-2 py-2 text-right">Upcoming</th>
+                        <th className="px-2 py-2 text-right">Last send</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {touchpoints.map((tp) => (
-                        <tr key={tp.touchpoint_number} className="border-b border-[#f0f4f7] transition-colors hover:bg-[#f7f9fb]">
-                          <td className="px-6 py-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#054B70]/10 text-[12px] font-bold text-[#054B70]">
-                                {tp.touchpoint_number}
-                              </div>
-                              <span className="text-[13px] font-semibold text-[#0a2a3c]">TP {tp.touchpoint_number}</span>
-                            </div>
+                    <tbody className="divide-y divide-gray-950/5">
+                      {r.scorecard.map((c) => (
+                        <tr key={c.id} className="text-[13px]">
+                          <td className="px-2 py-2.5">
+                            <a href={`/email-templates?campaign=${c.id}`} className="font-bold text-[#0369a1] underline decoration-[#0369a1]/50 underline-offset-2">
+                              {c.name}
+                            </a>
+                            {c.automated && <span className="ml-1.5 rounded-full bg-emerald-500/[.16] px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">auto</span>}
                           </td>
-                          <td className="px-6 py-3.5 text-[13px] font-medium text-[#4a6a7a]">{tp.total_jobs}</td>
-                          <td className="px-6 py-3.5 text-[13px] font-medium text-[#4a6a7a]">{tp.recipients}</td>
-                          <td className="px-6 py-3.5">
-                            <span className="text-[13px] font-bold text-emerald-600">{tp.sent}</span>
-                          </td>
-                          <td className="px-6 py-3.5">
-                            <span className={`text-[13px] font-bold ${tp.failed > 0 ? "text-red-500" : "text-[#8ca3b3]"}`}>{tp.failed}</span>
-                          </td>
-                          <td className="px-6 py-3.5">
-                            <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[#f0f4f7]">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-500 ${tp.delivery_rate >= 90 ? "bg-emerald-500" : tp.delivery_rate >= 70 ? "bg-amber-500" : "bg-red-500"}`}
-                                  style={{ width: `${tp.delivery_rate}%` }}
-                                />
-                              </div>
-                              <span className={`text-[12px] font-bold ${tp.delivery_rate >= 90 ? "text-emerald-600" : tp.delivery_rate >= 70 ? "text-amber-600" : "text-red-500"}`}>
-                                {tp.delivery_rate}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-3.5 text-[12px] text-[#8ca3b3]">
-                            {tp.last_sent ? timeAgo(tp.last_sent) : "—"}
-                          </td>
-                          <td className="px-6 py-3.5">
-                            {tp.last_status && (
-                              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[tp.last_status] || "bg-gray-100 text-gray-500"}`}>
-                                {tp.last_status}
-                              </span>
+                          <td className="px-2 py-2.5 text-right font-bold tabular-nums">{c.sent.toLocaleString()}</td>
+                          <td className="px-2 py-2.5 text-right">
+                            {c.rate === null ? <span className="text-gray-400">—</span> : (
+                              <span className={`font-bold ${c.rate >= 95 ? "text-emerald-700" : c.rate >= 85 ? "text-amber-700" : "text-red-700"}`}>{c.rate}%</span>
                             )}
                           </td>
+                          <td className="px-2 py-2.5 text-right tabular-nums text-amber-700">{c.soft || "—"}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums text-red-700">{c.hard || "—"}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums">{c.optouts || "—"}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums">{c.upcoming || "—"}</td>
+                          <td className="px-2 py-2.5 text-right text-gray-500">{c.last_at ? dateTime(c.last_at) : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+              </Section>
 
-              {/* Per-Segment Performance */}
-              <div className="rounded-2xl bg-white shadow-sm overflow-hidden animate-fade-in-up" style={{ animationDelay: "0.12s" }}>
-                <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-5 border-b border-[#f0f4f7]">
-                  <div>
-                    <h2 className="text-[14px] font-bold text-[#0a2a3c]">Segment Performance</h2>
-                    <p className="text-[11px] text-[#8ca3b3]">Emails sent, leads, and outcomes per segment</p>
-                  </div>
-                </div>
-                {segments.length === 0 ? (
-                  <div className="px-6 py-10 text-center text-[13px] text-[#8ca3b3]">
-                    No segments yet. Tag contacts into a segment on the Contacts page to track them here.
-                  </div>
+              {/* 6 · How far people got */}
+              <Section
+                heading={`How far people got — ${r.funnel?.campaign ?? "no campaign yet"}`}
+                description={`${r.funnel?.auto ? "Your most active campaign — pick one in the filter to see another. " : ""}How many contacts reached each step of the flow.`}
+              >
+                {!r.funnel || r.funnel.steps.length === 0 ? (
+                  <p className="text-[13px] text-gray-500">No journey data yet.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[700px] text-left">
-                      <thead>
-                        <tr className="border-b border-[#e8eff3] text-[10px] font-bold uppercase tracking-wider text-[#8ca3b3]">
-                          <th className="px-6 py-3">Segment</th>
-                          <th className="px-4 py-3 text-right">Contacts</th>
-                          <th className="px-4 py-3 text-right">Emails Sent</th>
-                          <th className="px-4 py-3 text-right">Leads → HubSpot</th>
-                          <th className="px-4 py-3 text-right">Undeliverable</th>
-                          <th className="px-4 py-3 text-right">Opt-outs</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {segments.map((s) => (
-                          <tr key={s.id} className="border-b border-[#f0f4f7] hover:bg-[#f7f9fb] transition-colors">
-                            <td className="px-6 py-3.5">
-                              <p className="text-[13px] font-semibold text-[#0a2a3c]">{s.name}</p>
-                              <p className="text-[11px] text-[#8ca3b3]">{s.group_name}</p>
-                            </td>
-                            <td className="px-4 py-3.5 text-right text-[13px] font-medium text-[#0a2a3c] tabular-nums">{s.contacts}</td>
-                            <td className="px-4 py-3.5 text-right text-[13px] font-semibold text-[#054B70] tabular-nums">{s.sent}</td>
-                            <td className="px-4 py-3.5 text-right text-[13px] font-medium text-blue-600 tabular-nums">{s.moved_to_hubspot}</td>
-                            <td className="px-4 py-3.5 text-right text-[13px] font-medium text-orange-600 tabular-nums">{s.undeliverable}</td>
-                            <td className="px-4 py-3.5 text-right text-[13px] font-medium text-amber-600 tabular-nums">{s.opted_out}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Recent Activity */}
-              <div className="rounded-2xl bg-white shadow-sm overflow-hidden animate-fade-in-up" style={{ animationDelay: "0.13s" }}>
-                <div className="px-6 py-5 border-b border-[#f0f4f7]">
-                  <h2 className="text-[14px] font-bold text-[#0a2a3c]">Recent Activity</h2>
-                  <p className="text-[11px] text-[#8ca3b3]">Last 10 send jobs</p>
-                </div>
-                {recentJobs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-[#8ca3b3]">
-                    <svg className="mb-3 h-10 w-10 text-[#d0dce4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                      <path d="M3 3v18h18M9 17V9m4 8V5m4 12v-4" />
-                    </svg>
-                    <p className="text-[13px] font-semibold">No send jobs yet</p>
-                    <p className="mt-1 text-[11px]">Send your first email campaign from Email Templates</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-[#f0f4f7]">
-                    {recentJobs.map((job) => {
-                      const processed = job.sent_count + job.failed_count + job.skipped_count;
-                      const deliveryRate = (job.sent_count + job.failed_count) > 0
-                        ? Math.round((job.sent_count / (job.sent_count + job.failed_count)) * 100)
-                        : 0;
-
-                      return (
-                        <div key={job.id} className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-[#f7f9fb]">
-                          {/* TP badge */}
-                          <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-[13px] font-bold ${
-                            job.status === "running" ? "bg-blue-100 text-blue-700" :
-                            job.status === "completed" ? "bg-[#054B70]/10 text-[#054B70]" :
-                            job.status === "cancelled" ? "bg-gray-100 text-gray-500" :
-                            "bg-red-50 text-red-500"
-                          }`}>
-                            {job.touchpoint_number}
-                          </div>
-
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[13px] font-semibold text-[#0a2a3c]">
-                                Touchpoint {job.touchpoint_number}
-                              </span>
-                              {job.is_test && (
-                                <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[9px] font-semibold text-purple-600">TEST</span>
-                              )}
-                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${STATUS_COLORS[job.status] || "bg-gray-100 text-gray-500"}`}>
-                                {job.status}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-[#8ca3b3] mt-0.5">
-                              {formatDateTime(job.created_at)} by {job.started_by}
-                              {job.completed_at && ` · Finished ${formatDateTime(job.completed_at)}`}
-                            </p>
-                          </div>
-
-                          {/* Stats */}
-                          <div className="flex items-center gap-5 text-[12px]">
-                            <div className="text-center">
-                              <p className="font-bold text-emerald-600">{job.sent_count}</p>
-                              <p className="text-[9px] font-semibold text-[#8ca3b3]">Sent</p>
-                            </div>
-                            <div className="text-center">
-                              <p className={`font-bold ${job.failed_count > 0 ? "text-red-500" : "text-[#8ca3b3]"}`}>{job.failed_count}</p>
-                              <p className="text-[9px] font-semibold text-[#8ca3b3]">Failed</p>
-                            </div>
-                            <div className="text-center">
-                              <p className={`font-bold ${job.skipped_count > 0 ? "text-amber-500" : "text-[#8ca3b3]"}`}>{job.skipped_count}</p>
-                              <p className="text-[9px] font-semibold text-[#8ca3b3]">Skipped</p>
-                            </div>
-                            <div className="w-16">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-[10px] font-bold text-[#054B70]">{deliveryRate}%</span>
-                              </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#f0f4f7]">
-                                <div
-                                  className={`h-full rounded-full ${deliveryRate >= 90 ? "bg-emerald-500" : deliveryRate >= 70 ? "bg-amber-500" : "bg-red-500"}`}
-                                  style={{ width: `${deliveryRate}%` }}
-                                />
-                              </div>
-                            </div>
-                          </div>
+                  <div className="space-y-2">
+                    {r.funnel.steps.map((s) => (
+                      <div key={s.n} className="flex items-center gap-3 text-[13px]">
+                        <span className="w-28 shrink-0 font-semibold text-gray-950">Touchpoint {s.n}</span>
+                        <div className="h-4 flex-1 overflow-hidden rounded-full bg-gray-400/15">
+                          <div className="h-full rounded-full bg-[#054B70]" style={{ width: `${s.pct}%` }} />
                         </div>
-                      );
-                    })}
+                        <span className="w-28 shrink-0 text-right font-bold tabular-nums">
+                          {s.count.toLocaleString()} <span className="font-medium text-gray-400">· {s.pct}%</span>
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
+              </Section>
+
+              {/* 7 · Weekday vs weekend sending */}
+              <Section
+                heading="Weekday vs weekend sending"
+                description="You aim to send on weekdays. Weekend bars are flagged — anything there usually means a schedule landed on a Saturday or Sunday."
+              >
+                {r.weekday_split.weekend.sent + r.weekday_split.weekend.failed > 0 ? (
+                  <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/[.05] px-3 py-2 text-[13px]">
+                    <span className="rounded border border-red-500/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">Heads up</span>
+                    <span><strong className="text-red-700">{(r.weekday_split.weekend.sent + r.weekday_split.weekend.failed).toLocaleString()}</strong> email{r.weekday_split.weekend.sent + r.weekday_split.weekend.failed === 1 ? "" : "s"} went out on a weekend — check the schedules for those campaigns.</span>
+                  </div>
+                ) : (
+                  <div className="mb-4 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/[.05] px-3 py-2 text-[13px]">
+                    <span className="rounded border border-emerald-500/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">All good</span>
+                    <span>All <strong>{(r.weekday_split.weekday.sent + r.weekday_split.weekday.failed).toLocaleString()}</strong> sends went out on weekdays — no weekend sends.</span>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  {r.weekday_split.days.map((d) => {
+                    const att = d.sent + d.failed;
+                    const maxAtt = Math.max(1, ...r.weekday_split.days.map((x) => x.sent + x.failed));
+                    const weekend = d.day === "Saturday" || d.day === "Sunday";
+                    return (
+                      <div key={d.day} className="flex items-center gap-3 text-[13px]">
+                        <span className={`w-24 shrink-0 ${weekend ? "font-bold text-red-700" : "text-gray-950"}`}>{d.day}</span>
+                        <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-400/15">
+                          <div className={`h-full rounded-full ${weekend ? "bg-[#ef4444]" : "bg-[#054B70]"}`} style={{ width: `${(att / maxAtt) * 100}%` }} />
+                        </div>
+                        <span className="w-16 shrink-0 text-right font-bold tabular-nums">{att.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
+
+              {/* 8 · How each email performs */}
+              <Section
+                heading="How each email performs"
+                description="Every email (touchpoint) in your flows. The bar shows what share of attempted deliveries actually arrived; failures are the bounces."
+              >
+                {tpRows.length === 0 ? (
+                  <p className="text-[13px] text-gray-500">No touchpoint sends yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {tpRows.map((t) => (
+                      <div key={t.n} className="flex items-center gap-3 text-[13px]">
+                        <span className="w-28 shrink-0 font-semibold text-gray-950">Touchpoint {t.n}</span>
+                        <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-400/15">
+                          <div
+                            className={`h-full rounded-full ${t.rate === null ? "" : t.rate >= 95 ? "bg-[#059669]" : t.rate >= 80 ? "bg-[#b45309]" : "bg-[#b91c1c]"}`}
+                            style={{ width: `${t.rate ?? 0}%` }}
+                          />
+                        </div>
+                        <span className="w-28 shrink-0 text-right tabular-nums text-gray-500">
+                          {t.rate === null ? "—" : (
+                            <><strong className={t.rate >= 95 ? "text-emerald-700" : t.rate >= 80 ? "text-amber-700" : "text-red-700"}>{t.rate}%</strong> · {t.sent.toLocaleString()} sent</>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              {/* 9 · Audience by group + Recent sends */}
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <Section heading="Audience by group">
+                  {r.audience_groups.length === 0 ? (
+                    <p className="text-[13px] text-gray-500">No groups yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {r.audience_groups.map((g) => (
+                        <div key={g.name} className="flex items-center gap-3 text-[13px]">
+                          <span className="w-40 shrink-0 truncate text-gray-950">{g.name}</span>
+                          <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-400/15">
+                            <div className="h-full rounded-full bg-[#054B70]" style={{ width: `${(g.count / maxGroup) * 100}%` }} />
+                          </div>
+                          <span className="w-12 shrink-0 text-right font-bold tabular-nums">{g.count.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
+
+                <Section heading="Recent sends">
+                  {r.recent_jobs.length === 0 ? (
+                    <p className="text-[13px] text-gray-500">Nothing sent yet.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {r.recent_jobs.slice(0, 8).map((j) => (
+                        <div key={j.id} className="flex items-center gap-3 text-[13px]">
+                          <span className="w-12 shrink-0 font-semibold text-gray-950">TP {j.touchpoint_number || "—"}</span>
+                          <span className="flex-1 text-gray-500">{dateTime(j.created_at)}</span>
+                          <span className="shrink-0 tabular-nums">
+                            <strong className="text-emerald-700">{j.sent_count}</strong> sent
+                            {j.failed_count > 0 && <> · <strong className="text-red-700">{j.failed_count}</strong> failed</>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
               </div>
-            </div>
+
+              {/* 10 · Bounces */}
+              <Section
+                heading="Bounces — emails that couldn't be delivered"
+                description="Soft = temporary problem, worth retrying. Hard = the address doesn't exist, we stop sending to it."
+              >
+                {allBounces === 0 ? (
+                  <p className="text-[13px] text-gray-500">No bounces — every attempted email was delivered.</p>
+                ) : (
+                  <>
+                    <div className="mb-1 flex h-4 overflow-hidden rounded-full bg-gray-400/15">
+                      <div className="h-full bg-[#f59e0b]" style={{ width: `${(r.bounces.soft / allBounces) * 100}%` }} />
+                      <div className="h-full bg-[#ef4444]" style={{ width: `${(r.bounces.hard / allBounces) * 100}%` }} />
+                    </div>
+                    <p className="mb-5 text-[12px] text-gray-500">
+                      <strong className="text-amber-700">{allBounces ? Math.round((r.bounces.soft / allBounces) * 100) : 0}%</strong> soft (retryable) &nbsp;·&nbsp;
+                      <strong className="text-red-700">{allBounces ? Math.round((r.bounces.hard / allBounces) * 100) : 0}%</strong> hard (permanent)
+                    </p>
+
+                    {r.bounces.reasons.length > 0 && (
+                      <div className="mb-5">
+                        <p className={MINI}>Why they bounced</p>
+                        <div className="space-y-1.5">
+                          {r.bounces.reasons.map((x) => (
+                            <div key={`${x.kind}-${x.reason}`} className="flex items-center gap-3 text-[13px]">
+                              <span className="w-56 shrink-0 truncate font-semibold text-gray-950" title={x.reason}>{x.reason}</span>
+                              <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-gray-400/15">
+                                <div className={`h-full rounded-full ${x.kind === "hard" ? "bg-[#ef4444]" : "bg-[#f59e0b]"}`} style={{ width: `${(x.count / maxReason) * 100}%` }} />
+                              </div>
+                              <span className="w-16 shrink-0 text-right font-bold tabular-nums">
+                                {x.count} <span className="font-medium text-gray-400">· {allBounces ? Math.round((x.count / allBounces) * 100) : 0}%</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {r.bounces.dead_addresses.length > 0 && (
+                      <div>
+                        <p className={MINI}>
+                          Dead addresses{r.bounces.dead_total > r.bounces.dead_addresses.length ? ` — latest ${r.bounces.dead_addresses.length}` : ""}
+                        </p>
+                        <div className="space-y-1">
+                          {r.bounces.dead_addresses.map((d) => (
+                            <div key={d.email} className="flex items-baseline gap-3 text-[13px]">
+                              <span className="max-w-[260px] truncate font-bold text-gray-950">{d.email}</span>
+                              <span className="flex-1 truncate text-gray-500">{d.org_name}</span>
+                              <span className="shrink-0 text-[12px] text-gray-400">{shortDate(d.updated_at)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <a href="/contacts" className="mt-2.5 inline-block text-[12px] font-bold text-[#0369a1]">
+                          See all {r.bounces.dead_total} dead address{r.bounces.dead_total === 1 ? "" : "es"} in Contacts →
+                        </a>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Section>
+
+              {/* 11 · Opt-outs */}
+              <Section
+                heading="Opt-outs — people who opted out"
+                description="Everyone who opted out, how they did it, and which organisations they belong to."
+              >
+                {r.optouts.total === 0 ? (
+                  <p className="text-[13px] text-gray-500">Nobody has opted out.</p>
+                ) : (
+                  <>
+                    <div className="mb-5 grid grid-cols-2 gap-3 sm:max-w-sm">
+                      <div className="rounded-lg border border-gray-400/20 px-4 py-3 text-center">
+                        <div className="text-[22px] font-extrabold leading-none tabular-nums text-amber-700">{r.optouts.total}</div>
+                        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Opted out</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-400/20 px-4 py-3 text-center">
+                        <div className="text-[22px] font-extrabold leading-none tabular-nums text-gray-950">{r.optouts.with_reason}</div>
+                        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Gave a reason</div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                      <div>
+                        <p className={MINI}>By organisation</p>
+                        <div className="space-y-1">
+                          {r.optouts.by_org.map((o) => (
+                            <div key={o.org} className="flex items-center gap-3 text-[13px]">
+                              <span className="flex-1 truncate text-gray-950">{o.org}</span>
+                              <span className="shrink-0 font-bold tabular-nums">{o.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className={MINI}>Most recent</p>
+                        <div className="space-y-1.5">
+                          {r.optouts.recent.map((o) => (
+                            <div key={o.email} className="flex items-baseline gap-2 text-[13px]">
+                              <span className="shrink-0 font-bold text-gray-950">{o.contact_name || o.email}</span>
+                              <span className="min-w-0 flex-1 truncate text-right text-[12px] text-gray-400">
+                                {o.reason || "No reason given"} · {shortDate(o.at)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </Section>
+            </>
           )}
         </main>
       </MainContent>
-
-      {/* Drill-down modal */}
-      {drillType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={closeDrilldown}>
-          <div className="w-full max-w-6xl mx-4 max-h-[85vh] flex flex-col rounded-2xl bg-white shadow-xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#f0f4f7]">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${DRILL_LABELS[drillType]?.bg}`}>
-                  <svg className={`h-4.5 w-4.5 ${DRILL_LABELS[drillType]?.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    {drillType === "sent" && <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />}
-                    {drillType === "failed" && <path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
-                    {drillType === "skipped" && <path d="M13 5l7 7-7 7M5 5l7 7-7 7" />}
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-[15px] font-bold text-[#0a2a3c]">{DRILL_LABELS[drillType]?.title}</h2>
-                  <p className="text-[11px] text-[#8ca3b3]">{drillTotal} total records</p>
-                </div>
-              </div>
-              <button onClick={closeDrilldown} className="rounded-lg p-2 text-[#8ca3b3] hover:bg-[#f0f4f7] transition-colors">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            {/* Table */}
-            <div className="flex-1 overflow-auto">
-              {drillLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <svg className="h-6 w-6 animate-spin text-[#054B70]" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                </div>
-              ) : drillRecords.length === 0 ? (
-                <div className="flex items-center justify-center py-16 text-[13px] text-[#8ca3b3]">
-                  No records found
-                </div>
-              ) : (
-                <table className="w-full text-left">
-                  <thead className="sticky top-0 bg-white">
-                    <tr className="border-b border-[#e8eff3] text-[10px] font-bold uppercase tracking-wider text-[#8ca3b3]">
-                      <th className="px-6 py-3">Contact</th>
-                      <th className="px-6 py-3">Email</th>
-                      <th className="px-6 py-3">Organization</th>
-                      <th className="px-6 py-3">TP</th>
-                      <th className="px-6 py-3">Date</th>
-                      {drillType === "failed" && <th className="px-6 py-3">Error</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {drillRecords.map((r) => (
-                      <tr key={r.id} className="border-b border-[#f0f4f7] hover:bg-[#f7f9fb] transition-colors">
-                        <td className="px-6 py-3 text-[13px] font-medium text-[#0a2a3c]">{r.contact_name || "—"}</td>
-                        <td className="px-6 py-3 text-[13px] text-[#6b8a9e] font-mono">{r.email}</td>
-                        <td className="px-6 py-3 text-[13px] text-[#4a6a7a]">{r.org_name || "—"}</td>
-                        <td className="px-6 py-3">
-                          <span className="rounded-full bg-[#054B70]/8 px-2 py-0.5 text-[10px] font-semibold text-[#054B70]">
-                            TP {r.touchpoint_number}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 text-[12px] text-[#8ca3b3]">
-                          {r.sent_at ? formatDateTime(r.sent_at) : formatDateTime(r.job_created_at)}
-                        </td>
-                        {drillType === "failed" && (
-                          <td className="px-6 py-3 text-[12px] text-red-500 max-w-[200px] truncate" title={r.error}>
-                            {r.error || "—"}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {/* Pagination */}
-            {drillPages > 1 && (
-              <div className="flex items-center justify-between border-t border-[#f0f4f7] px-6 py-3">
-                <span className="text-[11px] text-[#8ca3b3]">
-                  Page {drillPage} of {drillPages}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    disabled={drillPage <= 1}
-                    onClick={() => openDrilldown(drillType, drillPage - 1)}
-                    className="rounded-lg border border-[#d0dce4] px-3 py-1.5 text-[11px] font-semibold text-[#6b8a9e] disabled:opacity-30 hover:bg-[#f0f4f7] transition-colors"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    disabled={drillPage >= drillPages}
-                    onClick={() => openDrilldown(drillType, drillPage + 1)}
-                    className="rounded-lg border border-[#d0dce4] px-3 py-1.5 text-[11px] font-semibold text-[#6b8a9e] disabled:opacity-30 hover:bg-[#f0f4f7] transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
+  );
+}
+
+/* useSearchParams needs a Suspense boundary in Next.js */
+export default function ReportingPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReportingPageInner />
+    </Suspense>
   );
 }

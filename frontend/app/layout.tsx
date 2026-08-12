@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "./components/SidebarContext";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Inter — the Filament panel typeface (matches the Helix suite look).
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -26,9 +27,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body suppressHydrationWarning className="min-h-full flex flex-col">
+        {/* Restore the saved theme before first paint to avoid a light flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("moc-theme")==="dark")document.documentElement.classList.add("dark")}catch(e){}`,
+          }}
+        />
         <SidebarProvider>{children}</SidebarProvider>
       </body>
     </html>
