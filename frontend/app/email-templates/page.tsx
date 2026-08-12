@@ -279,12 +279,16 @@ function EmailTemplatesPageInner() {
   // Schedule the whole flow from the board (same endpoint the campaigns list uses)
   const [showScheduleFlow, setShowScheduleFlow] = useState(false);
   const [schStartAt, setSchStartAt] = useState("");
+  const [schGroupId, setSchGroupId] = useState("");
+  const [schSegmentId, setSchSegmentId] = useState("");
   const [schBusy, setSchBusy] = useState(false);
 
   function openScheduleFlow() {
     const t = new Date(Date.now() + 86400000);
     const pad = (x: number) => String(x).padStart(2, "0");
     setSchStartAt(`${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T09:00`);
+    setSchGroupId("");
+    setSchSegmentId("");
     setShowScheduleFlow(true);
   }
 
@@ -299,6 +303,8 @@ function EmailTemplatesPageInner() {
           campaign_id: campaignId || undefined,
           when: "later",
           start_at: new Date(schStartAt).toISOString(),
+          ...(schGroupId ? { import_group_id: Number(schGroupId) } : {}),
+          ...(schSegmentId ? { segment_id: Number(schSegmentId) } : {}),
         }),
         credentials: "include",
       });
@@ -2332,6 +2338,26 @@ function EmailTemplatesPageInner() {
             <p className="mb-4 text-[12px] text-gray-500">
               Touchpoint 1 goes out at the launch time; each next touchpoint follows after its own wait. Watch and cancel it on the Schedule page.
             </p>
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Target group</label>
+            <Select
+              value={schGroupId}
+              onChange={(v) => { setSchGroupId(v); setSchSegmentId(""); }}
+              options={[{ value: "", label: "Campaign default — or all active contacts" }, ...importGroups.map((g) => ({ value: String(g.id), label: g.name }))]}
+              searchable
+              className="mb-3 w-full"
+            />
+            {schGroupId && segments.some((s) => String(s.import_group_id) === schGroupId) && (
+              <>
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Segment (optional)</label>
+                <Select
+                  value={schSegmentId}
+                  onChange={setSchSegmentId}
+                  options={[{ value: "", label: "Whole group" }, ...segments.filter((s) => String(s.import_group_id) === schGroupId).map((s) => ({ value: String(s.id), label: s.name }))]}
+                  searchable
+                  className="mb-3 w-full"
+                />
+              </>
+            )}
             <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Launch at</label>
             <DatePicker withTime value={schStartAt} onChange={setSchStartAt} className="mb-5 w-full" />
             <div className="flex justify-end gap-2">
