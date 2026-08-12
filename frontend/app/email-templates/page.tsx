@@ -1784,7 +1784,10 @@ function EmailTemplatesPageInner() {
                   {/* Attachment + Signature image uploads */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1.5 block text-[13px] font-medium text-gray-950">Attachment</label>
+                      <label className="mb-1 block text-[13px] font-medium text-gray-950">Attachment</label>
+                      <p className="mb-1.5 text-[12px] text-gray-500">
+                        Up to 200 MB. Files over 25 MB are delivered as a download link inside the email — mail systems reject bigger raw attachments.
+                      </p>
                       {!showingAttachment ? (
                         <label
                           onDragOver={(e) => e.preventDefault()}

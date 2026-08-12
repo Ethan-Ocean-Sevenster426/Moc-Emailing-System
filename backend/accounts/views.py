@@ -328,6 +328,36 @@ def _optout_url(contact_id):
     return f'{base}/api/optout/{_optout_token(contact_id)}/'
 
 
+# Raw-attach cap: bigger files are delivered as a hosted download link instead
+# (email systems reject messages around 40MB once base64 overhead is added).
+EMAIL_ATTACH_LIMIT = 25 * 1024 * 1024
+
+
+def _attachment_or_link(field):
+    """(attachment_dict, link_html) for an attachment FileField. Small files
+    attach normally; larger ones return a styled download-link block to append
+    to the email body (served from /media/ via PUBLIC_BASE_URL)."""
+    if not field:
+        return None, ''
+    att_path = field.path
+    name_part, ext = os.path.splitext(os.path.basename(att_path))
+    att_name = ' '.join(name_part.replace('_', ' ').replace('-', ' ').split()) + ext
+    if field.size > EMAIL_ATTACH_LIMIT:
+        base = getattr(django_settings, 'PUBLIC_BASE_URL', 'http://localhost:8000').rstrip('/')
+        url = f'{base}{field.url}'
+        mb = field.size / (1024 * 1024)
+        link_html = (
+            '<div style="margin-top:18px;padding:12px 16px;border:1px solid #d7dde3;border-radius:8px;background:#f6f8fa">'
+            f'<a href="{url}" style="font-weight:600;color:#054B70;text-decoration:underline">&#128206; Download attachment: {escape(att_name)}</a>'
+            f'<span style="color:#6b7280;font-size:12px"> ({mb:.0f} MB)</span>'
+            '</div>'
+        )
+        return None, link_html
+    with open(att_path, 'rb') as f:
+        att_bytes = f.read()
+    return {'name': att_name, 'contentBytes': base64.b64encode(att_bytes).decode('utf-8')}, ''
+
+
 def _text_to_html(text):
     """Convert a plain-text email body to simple HTML, preserving line breaks."""
     safe = escape(text or '').replace('\n', '<br>')
@@ -1136,14 +1166,15 @@ def email_template_save(request):
     tpl.days_after_previous = int(request.POST.get('days_after_previous', 7))
 
     if request.FILES.get('attachment'):
-        # Email systems cap messages around 40MB (base64 adds ~35%) — refuse
-        # attachments that can never be delivered instead of failing at send time.
+        # Up to 200MB is stored. Files over the raw-attach cap (~25MB) are
+        # delivered as a hosted download link in the email instead of a raw
+        # attachment (email systems reject ~40MB messages).
         _att = request.FILES['attachment']
-        if _att.size > 25 * 1024 * 1024:
+        if _att.size > 200 * 1024 * 1024:
             return JsonResponse({
                 'ok': False,
-                'error': f'"{_att.name}" is {_att.size / (1024 * 1024):.0f} MB — email systems reject messages this large. '
-                         'Keep attachments under 25 MB, or upload the file somewhere and link to it in the email instead.',
+                'error': f'"{_att.name}" is {_att.size / (1024 * 1024):.0f} MB — the limit is 200 MB. '
+                         'Upload the file somewhere and link to it in the email instead.',
             }, status=400)
         tpl.attachment = _att
     if request.POST.get('clear_attachment') == '1':
@@ -1260,23 +1291,17 @@ def send_test_email(request):
         '{{touchpoint_number}}': str(tp_num),
     }
 
-    # Build attachments
+    # Build attachments — files over the raw-attach cap become a download link
     attachments = []
     attachment_included = False
     if tpl.attachment:
         try:
-            att_path = tpl.attachment.path
-            with open(att_path, 'rb') as f:
-                att_bytes = f.read()
-            raw_name = os.path.basename(att_path)
-            name_part, ext = os.path.splitext(raw_name)
-            att_name = name_part.replace('_', ' ').replace('-', ' ')
-            att_name = ' '.join(att_name.split()) + ext
-            attachments.append({
-                'name': att_name,
-                'contentBytes': base64.b64encode(att_bytes).decode('utf-8'),
-            })
-            attachment_included = True
+            att_dict, att_link_html = _attachment_or_link(tpl.attachment)
+            if att_dict:
+                attachments.append(att_dict)
+            if att_link_html:
+                body_content += att_link_html
+            attachment_included = bool(att_dict) or bool(att_link_html)
         except Exception as e:
             print(f'[views] test email attachment load failed: {e}', flush=True)
     if sig_inline:
@@ -2538,14 +2563,15 @@ def templates_library_save(request):
         tpl.opt_out_text = request.POST.get('opt_out_text') or ''
 
     if request.FILES.get('attachment'):
-        # Email systems cap messages around 40MB (base64 adds ~35%) — refuse
-        # attachments that can never be delivered instead of failing at send time.
+        # Up to 200MB is stored. Files over the raw-attach cap (~25MB) are
+        # delivered as a hosted download link in the email instead of a raw
+        # attachment (email systems reject ~40MB messages).
         _att = request.FILES['attachment']
-        if _att.size > 25 * 1024 * 1024:
+        if _att.size > 200 * 1024 * 1024:
             return JsonResponse({
                 'ok': False,
-                'error': f'"{_att.name}" is {_att.size / (1024 * 1024):.0f} MB — email systems reject messages this large. '
-                         'Keep attachments under 25 MB, or upload the file somewhere and link to it in the email instead.',
+                'error': f'"{_att.name}" is {_att.size / (1024 * 1024):.0f} MB — the limit is 200 MB. '
+                         'Upload the file somewhere and link to it in the email instead.',
             }, status=400)
         tpl.attachment = _att
     if request.POST.get('clear_attachment') == '1':
@@ -2642,16 +2668,15 @@ def templates_library_send_test(request):
         except Exception as e:
             print(f'[lib-test] signature image load failed: {e}', flush=True)
 
-    # Attachments
+    # Attachments — files over the raw-attach cap become a download link
     attachments = []
     if tpl.attachment:
         try:
-            att_path = tpl.attachment.path
-            with open(att_path, 'rb') as f:
-                att_bytes = f.read()
-            name_part, ext = os.path.splitext(os.path.basename(att_path))
-            att_name = ' '.join(name_part.replace('_', ' ').replace('-', ' ').split()) + ext
-            attachments.append({'name': att_name, 'contentBytes': base64.b64encode(att_bytes).decode('utf-8')})
+            att_dict, att_link_html = _attachment_or_link(tpl.attachment)
+            if att_dict:
+                attachments.append(att_dict)
+            if att_link_html:
+                body_content += att_link_html
         except Exception as e:
             print(f'[lib-test] attachment load failed: {e}', flush=True)
     if sig_inline:
@@ -3344,32 +3369,6 @@ def _run_bulk_send(job_id):
     job.status = 'running'
     job.save()
 
-    # Fast-fail on undeliverable content: SES rejects ~40MB messages, so an
-    # oversized attachment would fail every recipient after a slow upload.
-    oversized_error = None
-    try:
-        if tpl.attachment and tpl.attachment.size > 25 * 1024 * 1024:
-            oversized_error = (
-                f'Message too large: attachment "{tpl.attachment.name.split("/")[-1]}" is '
-                f'{tpl.attachment.size / (1024 * 1024):.0f} MB (email limit ~25 MB). '
-                'Remove it from the touchpoint or attach a smaller file.'
-            )
-    except Exception:
-        pass
-    if oversized_error:
-        for log in SendLog.objects.filter(job=job, status='pending'):
-            log.status = 'failed'
-            log.error = oversized_error
-            log.sent_at = timezone.now()
-            log.save()
-            SendJob.objects.filter(id=job.id).update(failed_count=F('failed_count') + 1)
-        job.refresh_from_db()
-        job.status = 'completed'
-        job.completed_at = timezone.now()
-        job.save()
-        print(f'[BULK-SEND] Job #{job.id} aborted: {oversized_error}', flush=True)
-        return
-
     # Content comes from the chosen reusable template when present, else the touchpoint.
     # Attachment + signature image always come from the touchpoint (per-touchpoint files).
     lib = job.template
@@ -3426,21 +3425,16 @@ def _run_bulk_send(job_id):
         except Exception:
             pass
 
-    # Build attachment list
+    # Build attachment list — files over the raw-attach cap ride along as a
+    # hosted download link in the body instead.
     attachments = []
     if src_attachment:
         try:
-            att_path = src_attachment.path
-            with open(att_path, 'rb') as f:
-                att_bytes = f.read()
-            raw_name = os.path.basename(att_path)
-            name_part, ext = os.path.splitext(raw_name)
-            att_name = name_part.replace('_', ' ').replace('-', ' ')
-            att_name = ' '.join(att_name.split()) + ext
-            attachments.append({
-                'name': att_name,
-                'contentBytes': base64.b64encode(att_bytes).decode('utf-8'),
-            })
+            att_dict, att_link_html = _attachment_or_link(src_attachment)
+            if att_dict:
+                attachments.append(att_dict)
+            if att_link_html:
+                body_content += att_link_html
         except Exception:
             pass
     if sig_inline:
