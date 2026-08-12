@@ -92,8 +92,10 @@ body {
   .dark .bg-purple-50 { background-color: rgb(168 85 247 / 0.13); }
   .dark .bg-teal-50 { background-color: rgb(20 184 166 / 0.13); }
   .dark .bg-orange-50 { background-color: rgb(249 115 22 / 0.13); }
+  .dark .text-emerald-800 { color: #34d399; }
   .dark .text-emerald-700 { color: #34d399; }
   .dark .text-emerald-600 { color: #34d399; }
+  .dark .text-purple-800 { color: #c084fc; }
   .dark .text-green-700 { color: #4ade80; }
   .dark .text-amber-700 { color: #fbbf24; }
   .dark .text-amber-600 { color: #fbbf24; }
