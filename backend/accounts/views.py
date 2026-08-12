@@ -2774,7 +2774,7 @@ def optout_confirm(request, token):
     <p style="font-size:14px;color:#6b8a9e;line-height:1.6;margin:0 0 18px"><strong>{escape(contact.email)}</strong> will stop receiving all emails from us.</p>
     <label style="display:block;text-align:left;font-size:12px;color:#6b8a9e;margin:0 0 6px">Reason (optional)</label>
     <textarea name="reason" rows="2" placeholder="Tell us why, so we can do better…" style="width:100%;box-sizing:border-box;border:1px solid #d9e2e8;border-radius:10px;padding:10px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
-    <button type="submit" style="margin-top:18px;width:100%;background:#c0392b;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:bold;cursor:pointer">Unsubscribe me</button>
+    <button type="submit" style="margin-top:18px;width:100%;background:#054B70;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:bold;cursor:pointer">Unsubscribe me</button>
     <p style="font-size:12px;color:#b0c4d0;margin-top:24px">Magnum Opus Consultants</p>
   </form>
 </body></html>""")
