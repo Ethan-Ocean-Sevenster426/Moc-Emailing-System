@@ -322,15 +322,15 @@ export default function SendProgressPage() {
                     {/* accent bar */}
                     <div className="h-1 bg-gradient-to-r from-[#1d4ed8] via-[#60a5fa] to-[#1d4ed8]" />
 
-                    <div className="px-6 py-5">
+                    <div className="px-5 py-4">
                       {/* header */}
-                      <div className="mb-4 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-[2.6rem] w-[2.6rem] shrink-0 items-center justify-center rounded-[0.7rem] bg-[#1d4ed8] text-[16px] font-extrabold text-white">
+                      <div className="mb-2.5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#1d4ed8] text-[13px] font-extrabold text-white">
                             {job.touchpoint_number || "—"}
                           </div>
                           <div>
-                            <div className="flex items-center gap-1.5 text-[16px] font-bold text-gray-950">
+                            <div className="flex items-center gap-1.5 text-[14px] font-bold text-gray-950">
                               {jobTitle(job)}
                               {job.is_test && <span className="rounded bg-purple-600/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-600">Test</span>}
                             </div>
@@ -363,36 +363,33 @@ export default function SendProgressPage() {
                         </div>
                       </div>
 
-                      {/* big live counter */}
-                      <div className="mb-3 flex items-end gap-2">
-                        <span className="text-[42px] font-extrabold leading-none text-[#1d4ed8] tabular-nums">{processed}</span>
-                        <span className="mb-0.5 text-[20px] font-medium text-slate-400">/ {job.total_recipients}</span>
-                        <span className="mb-1 ml-1.5 text-[14px] font-bold text-[#1d4ed8]">{pct}%</span>
+                      {/* live counter + currently sending to, one tight row */}
+                      <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="text-[22px] font-extrabold leading-none text-[#1d4ed8] tabular-nums">{processed}</span>
+                        <span className="text-[13px] font-medium text-slate-400">/ {job.total_recipients}</span>
+                        <span className="text-[12px] font-bold text-[#1d4ed8]">{pct}%</span>
+                        {running && job.current_contact && (
+                          <span className="ml-2 text-[12px] text-[#6b8a9e]">
+                            · sending to <strong className="text-gray-900">{job.current_contact}</strong>
+                          </span>
+                        )}
                       </div>
 
-                      {/* currently sending to */}
-                      {running && job.current_contact && (
-                        <div className="mb-3 flex items-center gap-1.5 text-[12px] text-[#6b8a9e]">
-                          <svg className="h-3.5 w-3.5 text-[#3b82f6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
-                          Sending to <strong className="text-gray-900">{job.current_contact}</strong>
-                        </div>
-                      )}
-
                       {/* progress bar */}
-                      <div className="mb-4 h-[0.7rem] w-full overflow-hidden rounded-full bg-gray-400/20">
+                      <div className="mb-2.5 h-2 w-full overflow-hidden rounded-full bg-gray-400/20">
                         <div className="h-full rounded-full bg-gradient-to-r from-[#1d4ed8] to-[#60a5fa] transition-all duration-700 ease-out" style={{ width: `${pct}%` }} />
                       </div>
 
                       {/* stat pills */}
-                      <div className="flex flex-wrap gap-2.5">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/[.12] px-3 py-1.5 text-[12px] font-semibold text-emerald-800">
-                          <span className="h-2 w-2 rounded-full bg-[#10b981]" /> Sent {job.sent_count}
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/[.12] px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" /> Sent {job.sent_count}
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/[.12] px-3 py-1.5 text-[12px] font-semibold text-red-700">
-                          <span className="h-2 w-2 rounded-full bg-[#ef4444]" /> Failed {job.failed_count}
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/[.12] px-2.5 py-1 text-[11px] font-semibold text-red-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#ef4444]" /> Failed {job.failed_count}
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/[.14] px-3 py-1.5 text-[12px] font-semibold text-amber-700">
-                          <span className="h-2 w-2 rounded-full bg-[#f59e0b]" /> Skipped {job.skipped_count}
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/[.14] px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#f59e0b]" /> Skipped {job.skipped_count}
                         </span>
                       </div>
                     </div>

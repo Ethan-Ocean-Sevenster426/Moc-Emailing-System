@@ -1136,7 +1136,16 @@ def email_template_save(request):
     tpl.days_after_previous = int(request.POST.get('days_after_previous', 7))
 
     if request.FILES.get('attachment'):
-        tpl.attachment = request.FILES['attachment']
+        # Email systems cap messages around 40MB (base64 adds ~35%) — refuse
+        # attachments that can never be delivered instead of failing at send time.
+        _att = request.FILES['attachment']
+        if _att.size > 25 * 1024 * 1024:
+            return JsonResponse({
+                'ok': False,
+                'error': f'"{_att.name}" is {_att.size / (1024 * 1024):.0f} MB — email systems reject messages this large. '
+                         'Keep attachments under 25 MB, or upload the file somewhere and link to it in the email instead.',
+            }, status=400)
+        tpl.attachment = _att
     if request.POST.get('clear_attachment') == '1':
         tpl.attachment = None
 
@@ -2529,7 +2538,16 @@ def templates_library_save(request):
         tpl.opt_out_text = request.POST.get('opt_out_text') or ''
 
     if request.FILES.get('attachment'):
-        tpl.attachment = request.FILES['attachment']
+        # Email systems cap messages around 40MB (base64 adds ~35%) — refuse
+        # attachments that can never be delivered instead of failing at send time.
+        _att = request.FILES['attachment']
+        if _att.size > 25 * 1024 * 1024:
+            return JsonResponse({
+                'ok': False,
+                'error': f'"{_att.name}" is {_att.size / (1024 * 1024):.0f} MB — email systems reject messages this large. '
+                         'Keep attachments under 25 MB, or upload the file somewhere and link to it in the email instead.',
+            }, status=400)
+        tpl.attachment = _att
     if request.POST.get('clear_attachment') == '1':
         tpl.attachment = None
 
@@ -4100,6 +4118,8 @@ def send_eligible_count(request):
 def _categorize_bounce(error_text):
     """Categorize a send failure into (kind, reason) where kind is 'hard'|'soft'|'other'."""
     e = (error_text or '').lower()
+    if 'content length exceeded' in e or 'message too large' in e or 'messagetoolarge' in e:
+        return 'soft', 'Message too large — shrink or remove the attachment'
     if 'no mx records' in e or 'invalid domain' in e:
         return 'hard', 'Invalid domain (no MX records)'
     if 'suppression list' in e:
