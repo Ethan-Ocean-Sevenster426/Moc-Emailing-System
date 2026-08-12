@@ -3344,6 +3344,32 @@ def _run_bulk_send(job_id):
     job.status = 'running'
     job.save()
 
+    # Fast-fail on undeliverable content: SES rejects ~40MB messages, so an
+    # oversized attachment would fail every recipient after a slow upload.
+    oversized_error = None
+    try:
+        if tpl.attachment and tpl.attachment.size > 25 * 1024 * 1024:
+            oversized_error = (
+                f'Message too large: attachment "{tpl.attachment.name.split("/")[-1]}" is '
+                f'{tpl.attachment.size / (1024 * 1024):.0f} MB (email limit ~25 MB). '
+                'Remove it from the touchpoint or attach a smaller file.'
+            )
+    except Exception:
+        pass
+    if oversized_error:
+        for log in SendLog.objects.filter(job=job, status='pending'):
+            log.status = 'failed'
+            log.error = oversized_error
+            log.sent_at = timezone.now()
+            log.save()
+            SendJob.objects.filter(id=job.id).update(failed_count=F('failed_count') + 1)
+        job.refresh_from_db()
+        job.status = 'completed'
+        job.completed_at = timezone.now()
+        job.save()
+        print(f'[BULK-SEND] Job #{job.id} aborted: {oversized_error}', flush=True)
+        return
+
     # Content comes from the chosen reusable template when present, else the touchpoint.
     # Attachment + signature image always come from the touchpoint (per-touchpoint files).
     lib = job.template
