@@ -1649,10 +1649,11 @@ def flow_board(request):
 def flow_touchpoint_add(request):
     """Add one email (a step) to the journey: where it sits ('It comes after'),
     what it starts from (optional saved template), and how long to wait before
-    it — minutes to months, with an optional pinned send time."""
+    it — minutes to months, with an optional pinned send time, or a pinned
+    calendar date that overrides the wait."""
     from django.db import transaction
     from django.db.models import Max
-    from django.utils.dateparse import parse_time
+    from django.utils.dateparse import parse_time, parse_date
 
     try:
         data = json.loads(request.body)
@@ -1681,6 +1682,7 @@ def flow_touchpoint_add(request):
         except (TypeError, ValueError):
             minutes = 7 * 1440
     send_time = parse_time((data.get('send_time') or '').strip()) if (data.get('send_time') or '').strip() else None
+    send_date = parse_date((data.get('send_date') or '').strip()) if (data.get('send_date') or '').strip() else None
 
     lib = EmailTemplate.objects.filter(id=data.get('template_id')).first() if data.get('template_id') else None
 
@@ -1702,6 +1704,7 @@ def flow_touchpoint_add(request):
             wait_minutes=0 if new_n == 1 else minutes,
             days_after_previous=0 if new_n == 1 else minutes // 1440,
             send_time=send_time,
+            scheduled_date=send_date,
             subject=lib.subject if lib else '',
             body=lib.body if lib else '',
             body_html=lib.body_html if lib else '',
@@ -1794,8 +1797,9 @@ def flow_touchpoint_clear(request):
 @require_role('admin', 'editor')
 def flow_wait_save(request):
     """Edit the wait before a touchpoint — combine units freely (months to
-    minutes), optionally pinning the clock time it sends at."""
-    from django.utils.dateparse import parse_time
+    minutes), optionally pinning the clock time it sends at, or a calendar
+    date that overrides the wait."""
+    from django.utils.dateparse import parse_time, parse_date
 
     try:
         data = json.loads(request.body)
@@ -1820,7 +1824,10 @@ def flow_wait_save(request):
     if 'send_time' in data:
         raw = (data.get('send_time') or '').strip()
         tpl.send_time = parse_time(raw) if raw else None
-    tpl.save(update_fields=['wait_minutes', 'days_after_previous', 'send_time', 'updated_at'])
+    if 'send_date' in data:
+        raw = (data.get('send_date') or '').strip()
+        tpl.scheduled_date = parse_date(raw) if raw else None
+    tpl.save(update_fields=['wait_minutes', 'days_after_previous', 'send_time', 'scheduled_date', 'updated_at'])
     return JsonResponse({
         'ok': True,
         'wait_minutes': minutes,
@@ -3599,15 +3606,17 @@ def schedules_schedule_campaign(request):
         group = segment.import_group
 
     batch_key = uuid.uuid4().hex
-    cumulative_minutes = 0
     rows = []
+    prev_when = launch
     for i, step in enumerate(steps):
-        if i > 0:
-            cumulative_minutes += step.wait_in_minutes()
-        when = launch + td(minutes=cumulative_minutes)
+        when = launch if i == 0 else prev_when + td(minutes=step.wait_in_minutes())
+        if step.scheduled_date:
+            # A pinned calendar date overrides the relative wait
+            when = when.replace(year=step.scheduled_date.year, month=step.scheduled_date.month, day=step.scheduled_date.day)
         if step.send_time:
             # The time pins the clock — e.g. wait 1 week and 3 days, then at 9:00 AM
             when = when.replace(hour=step.send_time.hour, minute=step.send_time.minute, second=0)
+        prev_when = when
         rows.append(ScheduledSend.objects.create(
             touchpoint=step,
             import_group=group,
@@ -3620,7 +3629,10 @@ def schedules_schedule_campaign(request):
 
     if run_now:
         first = rows[0]
-        claimed = ScheduledSend.objects.filter(id=first.id, status='scheduled').update(status='sent')
+        # A first step pinned to a future date stays scheduled instead of firing now
+        claimed = 0
+        if first.scheduled_for <= timezone.now():
+            claimed = ScheduledSend.objects.filter(id=first.id, status='scheduled').update(status='sent')
         if claimed:
             try:
                 _run_scheduled_send(first.id)

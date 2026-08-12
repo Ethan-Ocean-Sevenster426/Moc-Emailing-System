@@ -160,6 +160,7 @@ function EmailTemplatesPageInner() {
     wait_label: string;
     wait_parts: WaitParts;
     send_time: string;
+    scheduled_date: string;
     received: number;
     audience: number;
     bounces_soft: number;
@@ -189,6 +190,7 @@ function EmailTemplatesPageInner() {
   const [addAfter, setAddAfter] = useState("0");
   const [addParts, setAddParts] = useState<WaitParts>(EMPTY_WAIT);
   const [addTime, setAddTime] = useState("");
+  const [addDate, setAddDate] = useState("");
   const [addTemplateId, setAddTemplateId] = useState("");
   // Explicit "fresh vs template" choice so the two paths are obvious
   const [addFrom, setAddFrom] = useState<"fresh" | "template">("fresh");
@@ -198,6 +200,7 @@ function EmailTemplatesPageInner() {
     setAddAfter(String(board.length ? board[board.length - 1].touchpoint_number : 0));
     setAddParts(EMPTY_WAIT);
     setAddTime("");
+    setAddDate("");
     setAddTemplateId("");
     setAddFrom("fresh");
     setShowAddTp(true);
@@ -214,6 +217,7 @@ function EmailTemplatesPageInner() {
           after: Number(addAfter),
           ...addParts,
           send_time: addTime,
+          send_date: addDate,
           template_id: addTemplateId ? Number(addTemplateId) : undefined,
         }),
         credentials: "include",
@@ -239,11 +243,13 @@ function EmailTemplatesPageInner() {
   const [waitTp, setWaitTp] = useState<number | null>(null);
   const [waitParts, setWaitParts] = useState<WaitParts>(EMPTY_WAIT);
   const [waitTime, setWaitTime] = useState("");
+  const [waitDate, setWaitDate] = useState("");
 
   function openWaitEditor(bt: BoardTP) {
     setWaitTp(bt.touchpoint_number);
     setWaitParts({ ...bt.wait_parts });
     setWaitTime(bt.send_time || "");
+    setWaitDate(bt.scheduled_date || "");
   }
   const [delTp, setDelTp] = useState<number | null>(null);
   // Test target: a touchpoint or a goodbye (identified by its storage number)
@@ -279,6 +285,7 @@ function EmailTemplatesPageInner() {
           touchpoint_number: waitTp,
           ...waitParts,
           send_time: waitTime,
+          send_date: waitDate,
           campaign_id: campaignId || undefined,
         }),
         credentials: "include",
@@ -287,7 +294,9 @@ function EmailTemplatesPageInner() {
       if (data.ok) {
         setWaitTp(null);
         notifyBoard(
-          data.wait_minutes === 0
+          waitDate
+            ? `Pinned to ${waitDate}${waitTime ? ` at ${waitTime}` : ""} — the wait is ignored`
+            : data.wait_minutes === 0
             ? "Wait removed — sends immediately after the previous touchpoint"
             : `Wait updated — ${data.wait_label}${waitTime ? `, then at ${waitTime}` : ""}`
         );
@@ -305,6 +314,7 @@ function EmailTemplatesPageInner() {
           touchpoint_number: tp,
           months: 0, weeks: 0, days: 0, hours: 0, minutes: 0,
           send_time: "",
+          send_date: "",
           campaign_id: campaignId || undefined,
         }),
         credentials: "include",
@@ -1111,7 +1121,9 @@ function EmailTemplatesPageInner() {
                                 <svg className="h-[14px] w-[14px] text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.8" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                {bt.wait_minutes === 0
+                                {bt.scheduled_date
+                                  ? `Sends on ${bt.scheduled_date}${bt.send_time ? ` at ${bt.send_time}` : ""}`
+                                  : bt.wait_minutes === 0
                                   ? "No wait — sends immediately"
                                   : `Wait ${bt.wait_label.toLowerCase()}${bt.send_time ? `, then at ${bt.send_time}` : ""}`}
                               </button>
@@ -2068,6 +2080,11 @@ function EmailTemplatesPageInner() {
                 <p className="text-[12px] text-gray-500">
                   Combine units freely — e.g. 1 week and 3 days. All zeros = sends immediately. The time pins the clock, e.g. at 9:00 AM.
                 </p>
+                <label className="mb-1 mt-3 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
+                <DatePicker value={addDate} onChange={setAddDate} placeholder="Pick a date…" className="mb-1 w-52" />
+                <p className="text-[12px] text-gray-500">
+                  A date here overrides the wait — the email goes out on that day (at the &quot;Then send at&quot; time if set).
+                </p>
               </fieldset>
             )}
 
@@ -2114,8 +2131,13 @@ function EmailTemplatesPageInner() {
               onChange={(e) => setWaitTime(e.target.value)}
               className="input-glow mb-1 w-40 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-900 outline-none"
             />
-            <p className="mb-5 text-[11px] text-gray-500">
+            <p className="mb-3 text-[11px] text-gray-500">
               Pins the clock time — e.g. wait 1 week and 3 days, then send at 9:00 AM. Blank = exactly after the wait.
+            </p>
+            <label className="mb-1 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
+            <DatePicker value={waitDate} onChange={setWaitDate} placeholder="Pick a date…" className="mb-1 w-52" />
+            <p className="mb-5 text-[11px] text-gray-500">
+              A date here overrides the wait — this email goes out on that day (at the &quot;Then send at&quot; time if set). Use Clear in the calendar to go back to the wait.
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setWaitTp(null)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>
