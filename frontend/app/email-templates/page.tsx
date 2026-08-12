@@ -478,6 +478,31 @@ function EmailTemplatesPageInner() {
     }
   }
 
+  // "Use a saved template" for a goodbye: it's saved straight to the board,
+  // ready to go — the editor only opens for emails written from scratch.
+  async function addGoodbyeFromTemplate(forTp: number, tplId: string) {
+    const lib = libraryTemplates.find((t) => String(t.id) === tplId);
+    if (!lib) { openGoodbye(forTp, tplId); return; }
+    const fd = new FormData();
+    fd.append("touchpoint_number", String(GOODBYE_OFFSET + forTp));
+    if (campaignId) fd.append("campaign_id", campaignId);
+    fd.append("subject", lib.subject ?? "");
+    fd.append("body", lib.body ?? "");
+    fd.append("body_html", lib.body_html ?? "");
+    fd.append("signature", lib.signature ?? "");
+    // "Leave the opt-out sentence blank — they have already opted out."
+    fd.append("opt_out_text", lib.opt_out_text ?? "");
+    fd.append("days_after_previous", "0");
+    try {
+      const res = await fetch(`${API}/email-templates/save/`, { method: "POST", body: fd, credentials: "include" });
+      const data = await res.json();
+      if (data.ok) {
+        notifyBoard(`Goodbye email added from "${lib.name}" — it's ready. Click Edit to tweak it.`);
+        await Promise.all([fetchBoard(), fetchTemplates()]);
+      } else notifyBoard(data.error || "Could not add the goodbye email");
+    } catch { notifyBoard("Could not add the goodbye email"); }
+  }
+
   async function removeGoodbye(forTp: number) {
     try {
       await fetch(`${API}/flow/goodbye/delete/`, {
@@ -2482,7 +2507,11 @@ function EmailTemplatesPageInner() {
                   const forTp = addGbFor;
                   const tplId = addGbTemplateId;
                   setAddGbFor(null);
-                  openGoodbye(forTp, tplId || undefined);
+                  if (forTp === null) return;
+                  // From a template → saved directly, stay on the board.
+                  // From scratch → straight into the editor to write it now.
+                  if (tplId) addGoodbyeFromTemplate(forTp, tplId);
+                  else openGoodbye(forTp);
                 }}
                 disabled={gbFrom === "template" && !addGbTemplateId}
                 className="btn-press rounded-lg bg-[#054B70] px-5 py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
