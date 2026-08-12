@@ -1544,9 +1544,9 @@ def campaigns_list(request):
     for c in qs.order_by('name'):
         tps = c.touchpoints.filter(is_goodbye=False)
         audience_parts = [p for p in [
-            c.import_group.name if c.import_group else '',
-            c.segment.name if c.segment else '',
-            f'#{c.tag.name}' if c.tag else '',
+            f'Group: {c.import_group.name}' if c.import_group else '',
+            f'Segment: {c.segment.name}' if c.segment else '',
+            f'Tag: {c.tag.name}' if c.tag else '',
         ] if p]
         campaigns.append({
             'id': c.id,
@@ -1574,9 +1574,9 @@ def campaigns_detail(request):
     if not c:
         return JsonResponse({'error': 'Campaign not found'}, status=404)
     audience_parts = [p for p in [
-        c.import_group.name if c.import_group else '',
-        c.segment.name if c.segment else '',
-        f'#{c.tag.name}' if c.tag else '',
+        f'Group: {c.import_group.name}' if c.import_group else '',
+        f'Segment: {c.segment.name}' if c.segment else '',
+        f'Tag: {c.tag.name}' if c.tag else '',
     ] if p]
     return JsonResponse({'ok': True, 'campaign': {
         'id': c.id, 'name': c.name, 'description': c.description,
