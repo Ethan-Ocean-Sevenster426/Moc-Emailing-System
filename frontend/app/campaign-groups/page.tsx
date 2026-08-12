@@ -29,6 +29,8 @@ interface CampaignRow {
   description: string;
   is_automated: boolean;
   segment_id: number | null;
+  import_group_id: number | null;
+  tag_id: number | null;
   audience: string;
   runs: number;
   touchpoints: number;
@@ -36,6 +38,8 @@ interface CampaignRow {
 }
 
 interface SegmentInfo { id: number; name: string; import_group_id: number; contact_count: number }
+interface ImportGroupInfo { id: number; name: string }
+interface TagInfo { id: number; name: string }
 
 export default function CampaignGroupsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -45,6 +49,8 @@ export default function CampaignGroupsPage() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [segments, setSegments] = useState<SegmentInfo[]>([]);
+  const [importGroups, setImportGroups] = useState<ImportGroupInfo[]>([]);
+  const [tags, setTags] = useState<TagInfo[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [perPage, setPerPage] = useState(10);
@@ -70,6 +76,8 @@ export default function CampaignGroupsPage() {
   const [cName, setCName] = useState("");
   const [cGroupId, setCGroupId] = useState("");
   const [cSegmentId, setCSegmentId] = useState("");
+  const [cAudGroupId, setCAudGroupId] = useState("");
+  const [cTagId, setCTagId] = useState("");
   const [cNotes, setCNotes] = useState("");
   const [cBusy, setCBusy] = useState(false);
 
@@ -107,6 +115,8 @@ export default function CampaignGroupsPage() {
         const res = await fetch(`${API}/contacts/`, { credentials: "include" });
         const data = await res.json();
         if (data.ok && data.segments) setSegments(data.segments);
+        if (data.ok && data.import_groups) setImportGroups(data.import_groups);
+        if (data.ok && data.tags) setTags(data.tags);
       } catch { /* */ }
     })();
   }, [fetchGroups]);
@@ -186,6 +196,8 @@ export default function CampaignGroupsPage() {
     setCName("");
     setCGroupId(openGroup ? String(openGroup.id) : "");
     setCSegmentId("");
+    setCAudGroupId("");
+    setCTagId("");
     setCNotes("");
     setShowCampaignModal(true);
   }
@@ -195,6 +207,8 @@ export default function CampaignGroupsPage() {
     setCName(c.name);
     setCGroupId(String(c.group_id));
     setCSegmentId(c.segment_id ? String(c.segment_id) : "");
+    setCAudGroupId(c.import_group_id ? String(c.import_group_id) : "");
+    setCTagId(c.tag_id ? String(c.tag_id) : "");
     setCNotes(c.description || "");
     setShowCampaignModal(true);
   }
@@ -212,6 +226,8 @@ export default function CampaignGroupsPage() {
           ...(editingCampaign ? { id: editingCampaign.id } : { group_id: Number(cGroupId) }),
           name,
           segment_id: cSegmentId ? Number(cSegmentId) : null,
+          import_group_id: cAudGroupId ? Number(cAudGroupId) : null,
+          tag_id: cTagId ? Number(cTagId) : null,
           notes: cNotes,
         }),
         credentials: "include",
@@ -261,7 +277,7 @@ export default function CampaignGroupsPage() {
       const res = await fetch(`${API}/schedules/schedule-campaign/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaign_id: c.id, when: "now", segment_id: c.segment_id }),
+        body: JSON.stringify({ campaign_id: c.id, when: "now" }),
         credentials: "include",
       });
       const data = await res.json();
@@ -290,7 +306,6 @@ export default function CampaignGroupsPage() {
           campaign_id: scheduleFor.id,
           when: "later",
           start_at: new Date(schStartAt).toISOString(),
-          segment_id: scheduleFor.segment_id,
         }),
         credentials: "include",
       });
@@ -703,17 +718,45 @@ export default function CampaignGroupsPage() {
                   options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
                   placeholder="Pick a group…"
                 />
-
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Audience (segment)</label>
-                <Select
-                  value={cSegmentId}
-                  onChange={setCSegmentId}
-                  className="mb-1 w-full"
-                  options={[{ value: "", label: "Select an option" }, ...segments.map((s) => ({ value: String(s.id), label: s.name }))]}
-                />
-                <p className="mb-3 text-[11px] text-gray-500">Who this campaign is for. Pre-filled on every send; optional.</p>
               </>
             )}
+
+            {/* Default audience: group → segment → tag. Used by sends & schedules unless overridden. */}
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Audience group (optional)</label>
+            <Select
+              value={cAudGroupId}
+              onChange={(v) => { setCAudGroupId(v); setCSegmentId(""); }}
+              searchable
+              className="mb-3 w-full"
+              options={[{ value: "", label: "All active contacts" }, ...importGroups.map((g) => ({ value: String(g.id), label: g.name }))]}
+            />
+
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Segment (optional)</label>
+            <Select
+              value={cSegmentId}
+              onChange={setCSegmentId}
+              searchable
+              className="mb-3 w-full"
+              options={[
+                { value: "", label: cAudGroupId ? "Whole group" : "Select an option" },
+                ...(cAudGroupId ? segments.filter((s) => String(s.import_group_id) === cAudGroupId) : segments).map((s) => ({
+                  value: String(s.id),
+                  label: cAudGroupId ? s.name : `${s.name} (${importGroups.find((g) => g.id === s.import_group_id)?.name || "group"})`,
+                })),
+              ]}
+            />
+
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Tag (optional)</label>
+            <Select
+              value={cTagId}
+              onChange={setCTagId}
+              searchable
+              className="mb-1 w-full"
+              options={[{ value: "", label: "No tag — everyone" }, ...tags.map((t) => ({ value: String(t.id), label: t.name }))]}
+            />
+            <p className="mb-3 text-[11px] text-gray-500">
+              Who this campaign sends to — pre-filled on every send and schedule. Leave empty to target all active contacts; you can still override it when sending.
+            </p>
 
             <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Notes (optional)</label>
             <textarea

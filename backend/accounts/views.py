@@ -1536,13 +1536,18 @@ def campaign_groups_delete(request):
 @require_http_methods(["GET"])
 @require_auth
 def campaigns_list(request):
-    qs = Campaign.objects.select_related('group', 'segment')
+    qs = Campaign.objects.select_related('group', 'segment', 'import_group', 'tag')
     group_id = request.GET.get('group_id')
     if group_id:
         qs = qs.filter(group_id=group_id)
     campaigns = []
     for c in qs.order_by('name'):
         tps = c.touchpoints.filter(is_goodbye=False)
+        audience_parts = [p for p in [
+            c.import_group.name if c.import_group else '',
+            c.segment.name if c.segment else '',
+            f'#{c.tag.name}' if c.tag else '',
+        ] if p]
         campaigns.append({
             'id': c.id,
             'name': c.name,
@@ -1551,7 +1556,9 @@ def campaigns_list(request):
             'description': c.description,
             'is_automated': c.is_automated,
             'segment_id': c.segment_id,
-            'audience': c.segment.name if c.segment else '',
+            'import_group_id': c.import_group_id,
+            'tag_id': c.tag_id,
+            'audience': ' · '.join(audience_parts),
             'runs': SendJob.objects.filter(touchpoint__campaign=c, is_test=False).count(),
             'touchpoints': sum(1 for t in tps if (t.subject or t.body or t.body_html)),
             'created_at': c.created_at.isoformat(),
@@ -1590,6 +1597,8 @@ def campaigns_create(request):
         group=group,
         description=(data.get('notes') or data.get('description') or '').strip(),
         segment=segment,
+        import_group=ImportGroup.objects.filter(id=data.get('import_group_id')).first() if data.get('import_group_id') else None,
+        tag=Tag.objects.filter(id=data.get('tag_id')).first() if data.get('tag_id') else None,
         is_automated=bool(data.get('is_automated')),
     )
     return JsonResponse({'ok': True, 'id': c.id})
@@ -1612,6 +1621,10 @@ def campaigns_update(request):
         c.description = (data.get('notes') or data.get('description') or '').strip()
     if 'segment_id' in data:
         c.segment = Segment.objects.filter(id=data.get('segment_id')).first() if data.get('segment_id') else None
+    if 'import_group_id' in data:
+        c.import_group = ImportGroup.objects.filter(id=data.get('import_group_id')).first() if data.get('import_group_id') else None
+    if 'tag_id' in data:
+        c.tag = Tag.objects.filter(id=data.get('tag_id')).first() if data.get('tag_id') else None
     c.save()
     return JsonResponse({'ok': True})
 
@@ -3534,6 +3547,10 @@ def _create_and_start_job(tpl, library_tpl, data, user, send_limit):
     seg_ids = data.get('segment_ids') or ([data.get('segment_id')] if data.get('segment_id') else [])
     seg_names = list(Segment.objects.filter(id__in=[s for s in seg_ids if s]).values_list('name', flat=True))
     target_parts.extend(seg_names)
+    if data.get('tag_id'):
+        t = Tag.objects.filter(id=data['tag_id']).first()
+        if t:
+            target_parts.append(f'#{t.name}')
     target_summary = ' · '.join(target_parts) if target_parts else 'all contacts'
 
     job = SendJob.objects.create(
@@ -3558,6 +3575,7 @@ def _run_scheduled_send(ss_id):
     data = {
         'import_group_id': ss.import_group_id,
         'segment_id': ss.segment_id,
+        'tag_id': ss.tag_id,
     }
     job, total_eligible, batch = _create_and_start_job(ss.touchpoint, ss.template, data, ss.created_by, ss.limit)
     if job:
@@ -3729,10 +3747,15 @@ def schedules_schedule_campaign(request):
 
     group = ImportGroup.objects.filter(id=data.get('import_group_id')).first() if data.get('import_group_id') else None
     segment = Segment.objects.filter(id=data.get('segment_id')).first() if data.get('segment_id') else None
+    tag = Tag.objects.filter(id=data.get('tag_id')).first() if data.get('tag_id') else None
     # Callers that don't pick an audience (e.g. the flow board's Schedule
-    # button) fall back to the campaign's default segment.
+    # button) fall back to the campaign's default audience.
     if segment is None and 'segment_id' not in data and campaign.segment_id:
         segment = campaign.segment
+    if group is None and 'import_group_id' not in data and campaign.import_group_id:
+        group = campaign.import_group
+    if tag is None and 'tag_id' not in data and campaign.tag_id:
+        tag = campaign.tag
     if segment:
         group = segment.import_group
 
@@ -3752,6 +3775,7 @@ def schedules_schedule_campaign(request):
             touchpoint=step,
             import_group=group,
             segment=segment,
+            tag=tag,
             limit=max(0, int(data.get('limit') or 0)),
             scheduled_for=when,
             batch_key=batch_key,
@@ -4021,6 +4045,8 @@ def _eligible_contacts_for_send(tp_num, data, campaign=None):
         segment_ids = [data['segment_id']]
     if segment_ids:
         qs = qs.filter(segment_id__in=segment_ids)
+    if data.get('tag_id'):
+        qs = qs.filter(tags__id=data['tag_id'])
     return qs
 
 

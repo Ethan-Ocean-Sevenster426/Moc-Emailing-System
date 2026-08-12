@@ -32,6 +32,14 @@ class Campaign(models.Model):
         'Segment', on_delete=models.SET_NULL, null=True, blank=True, related_name='campaigns',
         help_text='Default audience — pre-filled on every send; optional.',
     )
+    import_group = models.ForeignKey(
+        'ImportGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='campaigns',
+        help_text='Default audience group — used when a send/schedule picks no audience.',
+    )
+    tag = models.ForeignKey(
+        'Tag', on_delete=models.SET_NULL, null=True, blank=True, related_name='campaigns',
+        help_text='Default audience tag — only contacts carrying it are targeted.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -469,6 +477,7 @@ class ScheduledSend(models.Model):
     )
     import_group = models.ForeignKey(ImportGroup, on_delete=models.SET_NULL, null=True, blank=True)
     segment = models.ForeignKey(Segment, on_delete=models.SET_NULL, null=True, blank=True)
+    tag = models.ForeignKey('Tag', on_delete=models.SET_NULL, null=True, blank=True)
     limit = models.IntegerField(default=0, help_text='Max recipients for this run (0 = all eligible)')
     scheduled_for = models.DateTimeField()
     batch_key = models.CharField(
