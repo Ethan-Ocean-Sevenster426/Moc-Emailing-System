@@ -359,9 +359,9 @@ export default function CampaignGroupsPage() {
                 ) : (
                   <>
                     <p className="text-[11px] text-gray-400">Campaign Groups <span className="mx-1">›</span> List</p>
-                    <h1 className="text-[16px] font-bold text-gray-950">Campaigns &amp; Flows</h1>
+                    <h1 className="text-[16px] font-bold text-gray-950">Campaign Groups</h1>
                     <p className="truncate text-[11px] text-gray-500">
-                      Group → campaign → flow. Create a group, add campaigns inside it, and build each campaign&apos;s flow of touchpoints and waits.
+                      A group sits a level above campaigns and holds all the campaigns for one audience — e.g. an America group with all your American campaigns inside.
                     </p>
                   </>
                 )}
