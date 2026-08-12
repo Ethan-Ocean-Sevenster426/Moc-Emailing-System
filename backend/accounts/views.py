@@ -3850,10 +3850,22 @@ def schedules_schedule_campaign(request):
             claimed = ScheduledSend.objects.filter(id=first.id, status='scheduled').update(status='sent')
         if claimed:
             try:
-                job, total_eligible, batch = _run_scheduled_send(first.id)
-                started = {'job_id': job.id if job else None, 'recipients': batch, 'eligible': total_eligible}
+                _run_scheduled_send(first.id)
             except Exception as e:
                 print(f'[SCHEDULE] Run-now launch failed for batch {batch_key}: {e}', flush=True)
+        # Later steps that are due right now (no-wait steps) fire too — so a
+        # contact who already received TP1 jumps straight to their next
+        # touchpoint instead of waiting for a background poll.
+        _process_due_scheduled_sends()
+        jobs = [
+            r.send_job for r in
+            ScheduledSend.objects.filter(batch_key=batch_key).select_related('send_job')
+            if r.send_job
+        ]
+        started = {
+            'recipients': sum(j.total_recipients for j in jobs),
+            'jobs': len(jobs),
+        }
 
     return JsonResponse({
         'ok': True,

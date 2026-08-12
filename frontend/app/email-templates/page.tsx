@@ -2481,13 +2481,13 @@ function EmailTemplatesPageInner() {
                     <h2 className="text-[16px] font-bold text-gray-950">Sending started</h2>
                   </div>
                   <p className="mb-2 text-[13px] text-gray-700">
-                    Touchpoint 1 is going out right now to <span className="font-semibold text-gray-950">{startResult.recipients} contact{startResult.recipients === 1 ? "" : "s"}</span>
+                    Emails are going out right now to <span className="font-semibold text-gray-950">{startResult.recipients} contact{startResult.recipients === 1 ? "" : "s"}</span>
                     {campaignAudience ? ` (${campaignAudience})` : ""}.
                   </p>
                   <p className="mb-5 text-[12px] text-gray-500">
-                    {startResult.scheduled > 1 ? `The other ${startResult.scheduled - 1} email${startResult.scheduled - 1 === 1 ? "" : "s"} follow after their waits. ` : ""}
-                    {startResult.skipped ? `${startResult.skipped} empty touchpoint${startResult.skipped === 1 ? " was" : "s were"} skipped. ` : ""}
-                    Watch it live on Send Progress.
+                    Everyone resumes at their next touchpoint — nobody gets an email they already received. Later touchpoints follow after their waits.
+                    {startResult.skipped ? ` ${startResult.skipped} empty touchpoint${startResult.skipped === 1 ? " was" : "s were"} skipped.` : ""}
+                    {" "}Watch it live on Send Progress.
                   </p>
                   <div className="flex justify-end gap-2">
                     <button onClick={() => setConfirmStart(false)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Close</button>
@@ -2503,10 +2503,10 @@ function EmailTemplatesPageInner() {
                     <h2 className="text-[16px] font-bold text-gray-950">Started, but nobody was eligible</h2>
                   </div>
                   <p className="mb-2 text-[13px] text-gray-700">
-                    The flow is live, but no contacts matched <span className="font-semibold text-gray-950">{campaignAudience || "the audience"}</span> for Touchpoint 1 right now — nothing was sent.
+                    The flow is live, but no contacts in <span className="font-semibold text-gray-950">{campaignAudience || "the audience"}</span> needed a touchpoint right now — nothing was sent.
                   </p>
                   <p className="mb-5 text-[12px] text-gray-500">
-                    Check the campaign&apos;s audience (Edit Campaign) and that the contacts are Active. Then start the flow again.
+                    Everyone may already have every touchpoint that&apos;s ready, or the audience is empty. Check the campaign&apos;s audience (Edit Campaign) and that contacts are Active.
                   </p>
                   <div className="flex justify-end">
                     <button onClick={() => setConfirmStart(false)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Close</button>
