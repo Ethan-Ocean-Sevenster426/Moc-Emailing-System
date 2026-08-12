@@ -98,7 +98,10 @@ function ReportingPageInner() {
   const [segmentFocus, setSegmentFocus] = useState("");
   const [tagFocus, setTagFocus] = useState("");
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const fetchStats = useCallback(async (f: { campaign?: string; group?: string; segment?: string; tag?: string }) => {
+    setRefreshing(true);
     try {
       const p = new URLSearchParams();
       if (f.campaign) p.set("campaign_id", f.campaign);
@@ -110,6 +113,7 @@ function ReportingPageInner() {
       const data = await res.json();
       if (data.ok) setStats(data);
     } catch { /* */ }
+    setRefreshing(false);
     setLoaded(true);
   }, []);
 
@@ -262,7 +266,33 @@ function ReportingPageInner() {
                     Clear
                   </button>
                 )}
+                {refreshing && (
+                  <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#054B70]">
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Updating…
+                  </span>
+                )}
               </div>
+
+              {/* While a filter change is loading: dim the report and show a spinner */}
+              <div className="relative">
+              {refreshing && (
+                <div className="absolute inset-0 z-20 rounded-xl bg-white/80 backdrop-blur-[1.5px]">
+                  <div className="sticky top-40 flex justify-center pt-10">
+                    <div className="flex items-center gap-3 rounded-xl bg-white px-5 py-3.5 shadow-lg ring-1 ring-gray-950/10">
+                      <svg className="h-5 w-5 animate-spin text-[#054B70]" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="text-[13px] font-semibold text-gray-700">Applying filters…</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className={`space-y-5 transition-opacity duration-200 ${refreshing ? "pointer-events-none opacity-50" : ""}`}>
 
               {/* 1 · Results at a glance */}
               <Section
@@ -678,6 +708,8 @@ function ReportingPageInner() {
                   </>
                 )}
               </Section>
+              </div>
+              </div>
             </>
           )}
         </main>
