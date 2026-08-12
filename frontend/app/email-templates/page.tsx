@@ -2296,7 +2296,7 @@ function EmailTemplatesPageInner() {
             initial={{ opacity: 0, scale: 0.95, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={SPRING}
-            className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -2576,7 +2576,7 @@ function EmailTemplatesPageInner() {
       {/* Wait editor — "Wait before Touchpoint N", units combined freely */}
       {waitTp !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setWaitTp(null)}>
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-1 text-[16px] font-bold text-gray-900">Wait before Touchpoint {waitTp}</h2>
             <p className="mb-4 text-[12px] text-gray-500">
               How long the journey pauses after the previous email — combine units freely, e.g. 1 week and 3 days. Optionally pin the clock time it sends at.
