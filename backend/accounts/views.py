@@ -2730,7 +2730,8 @@ def _parse_upload_rows(uploaded):
     width = len(headers)
     data = []
     for r in rows[1:]:
-        r = [(cell or '').strip() for cell in r]
+        # Strip whitespace and Excel's leading-apostrophe text marker ('+44 → +44)
+        r = [(cell or '').strip().lstrip("'").strip() for cell in r]
         r = (r + [''] * width)[:width] if width else r
         data.append(r)
     return headers, data

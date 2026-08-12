@@ -112,6 +112,19 @@ function displayStatusValue(status: string) {
   return status === "bounced" ? "undeliverable" : status;
 }
 
+// Windowed pagination: 1 … 5 6 7 … 592 instead of every page number.
+function pageItems(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const items: (number | "…")[] = [1];
+  const lo = Math.max(2, current - 1);
+  const hi = Math.min(total - 1, current + 1);
+  if (lo > 2) items.push("…");
+  for (let n = lo; n <= hi; n++) items.push(n);
+  if (hi < total - 1) items.push("…");
+  items.push(total);
+  return items;
+}
+
 function statusBadge(status: string) {
   const displayStatus = displayStatusValue(status);
   const opt = STATUS_OPTIONS.find((s) => s.value === displayStatus);
@@ -1342,16 +1355,20 @@ export default function ContactsPage() {
                       >
                         ‹
                       </button>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                        <button
-                          key={n}
-                          onClick={() => setPage(n)}
-                          className={`min-w-8 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold ${
-                            n === curPage ? "bg-[#054B70]/10 text-[#054B70]" : "text-gray-500 hover:bg-gray-100"
-                          }`}
-                        >
-                          {n}
-                        </button>
+                      {pageItems(curPage, totalPages).map((n, i) => (
+                        n === "…" ? (
+                          <span key={`gap-${i}`} className="px-1.5 text-[13px] text-gray-400">…</span>
+                        ) : (
+                          <button
+                            key={n}
+                            onClick={() => setPage(n)}
+                            className={`min-w-8 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold ${
+                              n === curPage ? "bg-[#054B70]/10 text-[#054B70]" : "text-gray-500 hover:bg-gray-100"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        )
                       ))}
                       <button
                         onClick={() => setPage(Math.min(totalPages, curPage + 1))}
