@@ -47,6 +47,10 @@ class TouchpointTemplate(models.Model):
         Campaign, on_delete=models.CASCADE, null=True, blank=True, related_name='touchpoints',
     )
     touchpoint_number = models.IntegerField()
+    name = models.CharField(
+        max_length=200, default='', blank=True,
+        help_text='Optional custom label shown instead of "Touchpoint N".',
+    )
     subject = models.CharField(max_length=500, default='')
     body = models.TextField(default='')
     body_html = models.TextField(default='', blank=True)

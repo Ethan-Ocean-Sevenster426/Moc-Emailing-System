@@ -74,6 +74,7 @@ urlpatterns = [
     path("flow/wait/save/", views.flow_wait_save, name="flow_wait_save"),
     path("flow/touchpoint/clear/", views.flow_touchpoint_clear, name="flow_touchpoint_clear"),
     path("flow/touchpoint/add/", views.flow_touchpoint_add, name="flow_touchpoint_add"),
+    path("flow/touchpoint/rename/", views.flow_touchpoint_rename, name="flow_touchpoint_rename"),
     path("flow/touchpoint/delete/", views.flow_touchpoint_delete, name="flow_touchpoint_delete"),
     path("flow/goodbye/", views.goodbye_get, name="goodbye_get"),
     path("flow/goodbye/save/", views.goodbye_save, name="goodbye_save"),

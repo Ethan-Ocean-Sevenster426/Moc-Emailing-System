@@ -153,6 +153,7 @@ function EmailTemplatesPageInner() {
   interface WaitParts { months: number; weeks: number; days: number; hours: number; minutes: number }
   interface BoardTP {
     touchpoint_number: number;
+    name: string;
     subject: string;
     has_content: boolean;
     days_after_previous: number;
@@ -238,6 +239,37 @@ function EmailTemplatesPageInner() {
       } else notifyBoard(data.error || "Could not add");
     } catch { notifyBoard("Could not add"); }
     setAddBusy(false);
+  }
+
+  // Inline rename: give a touchpoint a custom label instead of "Touchpoint N"
+  const [renameTp, setRenameTp] = useState<number | null>(null);
+  const [renameVal, setRenameVal] = useState("");
+
+  function startRename(bt: BoardTP) {
+    setRenameTp(bt.touchpoint_number);
+    setRenameVal(bt.name || "");
+  }
+
+  async function saveRename() {
+    if (renameTp === null) return;
+    const tp = renameTp;
+    const name = renameVal.trim();
+    setRenameTp(null);
+    const prev = board.find((b) => b.touchpoint_number === tp)?.name || "";
+    if (name === prev) return;
+    try {
+      const res = await fetch(`${API}/flow/touchpoint/rename/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ touchpoint_number: tp, name, campaign_id: campaignId || undefined }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        notifyBoard(name ? `Renamed to "${name}"` : `Name cleared — back to "Touchpoint ${tp}"`);
+        fetchBoard();
+      } else notifyBoard(data.error || "Could not rename");
+    } catch { notifyBoard("Could not rename"); }
   }
 
   const [waitTp, setWaitTp] = useState<number | null>(null);
@@ -1152,12 +1184,44 @@ function EmailTemplatesPageInner() {
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-[14px] font-extrabold text-blue-700">
                               {n}
                             </span>
-                            <button type="button" onClick={() => openEditor(n)} className="min-w-0 flex-1 text-left">
-                              <span className="block text-[14px] font-bold text-gray-950">Touchpoint {n}</span>
-                              <span className="block truncate text-[12px] text-gray-500">
-                                {bt.subject || "No subject yet — click to edit"}
-                              </span>
-                            </button>
+                            {renameTp === n ? (
+                              <div className="min-w-0 flex-1">
+                                <input
+                                  autoFocus
+                                  value={renameVal}
+                                  onChange={(e) => setRenameVal(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setRenameTp(null); }}
+                                  onBlur={saveRename}
+                                  placeholder={`Touchpoint ${n}`}
+                                  maxLength={200}
+                                  className="w-full rounded-md bg-gray-50 px-2 py-1 text-[14px] font-bold text-gray-950 outline-none ring-2 ring-[#054B70]"
+                                />
+                                <span className="block truncate text-[11px] text-gray-500">Enter to save · Esc to cancel · empty goes back to Touchpoint {n}</span>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => openEditor(n)} className="group min-w-0 flex-1 text-left">
+                                <span className="flex items-center gap-1.5 text-[14px] font-bold text-gray-950">
+                                  <span className="truncate">{bt.name || `Touchpoint ${n}`}</span>
+                                  {canEdit && (
+                                    <span
+                                      role="button"
+                                      tabIndex={0}
+                                      title="Rename — use your own name for this touchpoint"
+                                      onClick={(e) => { e.stopPropagation(); startRename(bt); }}
+                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); startRename(bt); } }}
+                                      className="shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
+                                    >
+                                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+                                      </svg>
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="block truncate text-[12px] text-gray-500">
+                                  {bt.subject || "No subject yet — click to edit"}
+                                </span>
+                              </button>
+                            )}
                             {configured ? (
                               <span className="shrink-0 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-700">Ready</span>
                             ) : (
@@ -1380,7 +1444,9 @@ function EmailTemplatesPageInner() {
                       <p className="mt-0.5 text-[12px] text-gray-500">Sent once, automatically, when someone opts out right after this touchpoint. Leave the opt-out sentence blank — they have already opted out.</p>
                     </>
                   ) : (
-                    <h2 className="text-[16px] font-bold text-gray-950">Touchpoint {activeTP}</h2>
+                    <h2 className="text-[16px] font-bold text-gray-950">
+                      {board.find((b) => b.touchpoint_number === activeTP)?.name || `Touchpoint ${activeTP}`}
+                    </h2>
                   )}
                 </div>
 
@@ -1875,7 +1941,7 @@ function EmailTemplatesPageInner() {
                             {n}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold text-gray-900">Touchpoint {n}</p>
+                            <p className="text-[13px] font-semibold text-gray-900">{board.find((b) => b.touchpoint_number === n)?.name || `Touchpoint ${n}`}</p>
                             <p className="text-[10px] text-gray-500 truncate">
                               {tpl?.subject || "No subject set"}
                             </p>

@@ -1620,6 +1620,7 @@ def flow_board(request):
         wait_min = t.wait_in_minutes()
         board.append({
             'touchpoint_number': n,
+            'name': t.name,
             'subject': t.subject,
             'has_content': bool(t.subject or t.body or t.body_html),
             'days_after_previous': t.days_after_previous,
@@ -1717,6 +1718,25 @@ def flow_touchpoint_add(request):
         'wait_label': TouchpointTemplate.human_wait(step.wait_in_minutes()),
         'copied_from': lib.name if lib else '',
     })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@require_role('admin', 'editor')
+def flow_touchpoint_rename(request):
+    """Give a touchpoint a custom label (blank = back to "Touchpoint N")."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    tp_num = data.get('touchpoint_number')
+    if not tp_num or int(tp_num) < 1:
+        return JsonResponse({'error': 'touchpoint_number required'}, status=400)
+    campaign = _resolve_campaign(data.get('campaign_id'))
+    tpl, _ = TouchpointTemplate.objects.get_or_create(touchpoint_number=int(tp_num), campaign=campaign)
+    tpl.name = (data.get('name') or '').strip()[:200]
+    tpl.save(update_fields=['name', 'updated_at'])
+    return JsonResponse({'ok': True, 'name': tpl.name})
 
 
 @csrf_exempt
