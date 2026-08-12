@@ -152,6 +152,12 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Editor saves can be huge: pasted HTML emails may embed base64 images, and
+# attachments ride the same multipart request. Match nginx's 100M limit
+# (Django's 2.5MB default would reject them with a 400 after nginx lets
+# them through).
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+
 # Console email mode: emails are printed to the server console instead of
 # being sent (no AWS calls, no cost). Auto-enabled when SES credentials are
 # blank; force with EMAIL_CONSOLE_MODE=True / disable with =False.
