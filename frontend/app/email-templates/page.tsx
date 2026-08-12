@@ -190,6 +190,8 @@ function EmailTemplatesPageInner() {
   const [addParts, setAddParts] = useState<WaitParts>(EMPTY_WAIT);
   const [addTime, setAddTime] = useState("");
   const [addTemplateId, setAddTemplateId] = useState("");
+  // Explicit "fresh vs template" choice so the two paths are obvious
+  const [addFrom, setAddFrom] = useState<"fresh" | "template">("fresh");
   const [addBusy, setAddBusy] = useState(false);
 
   function openAddTouchpoint() {
@@ -197,6 +199,7 @@ function EmailTemplatesPageInner() {
     setAddParts(EMPTY_WAIT);
     setAddTime("");
     setAddTemplateId("");
+    setAddFrom("fresh");
     setShowAddTp(true);
   }
 
@@ -252,6 +255,7 @@ function EmailTemplatesPageInner() {
   // Add-goodbye dialog — like Add touchpoint: copy a saved email or write from scratch
   const [addGbFor, setAddGbFor] = useState<number | null>(null);
   const [addGbTemplateId, setAddGbTemplateId] = useState("");
+  const [gbFrom, setGbFrom] = useState<"fresh" | "template">("fresh");
   // Flow templates ("Use template" / "Save as template")
   const [showUseTemplate, setShowUseTemplate] = useState(false);
   const [flowTemplates, setFlowTemplates] = useState<{ id: number; name: string; touchpoint_count: number; goodbye_count: number }[]>([]);
@@ -1301,7 +1305,7 @@ function EmailTemplatesPageInner() {
                               ) : canEdit ? (
                                 <button
                                   type="button"
-                                  onClick={() => { setAddGbFor(n); setAddGbTemplateId(""); }}
+                                  onClick={() => { setAddGbFor(n); setAddGbTemplateId(""); setGbFrom("fresh"); }}
                                   className="block w-full rounded-[11px] border-[1.5px] border-dashed border-amber-500/50 bg-amber-500/[0.03] px-4 py-3.5 text-left text-[13px] font-bold text-amber-700 hover:bg-amber-500/[0.08]"
                                 >
                                   + Add an opt-out goodbye email
@@ -1998,16 +2002,41 @@ function EmailTemplatesPageInner() {
               </>
             )}
 
-            <label className="mb-1 block text-[13px] font-medium text-gray-950">Copy a saved email? (optional)</label>
-            <Select
-              value={addTemplateId}
-              onChange={setAddTemplateId}
-              options={[{ value: "", label: "Select an option" }, ...libraryTemplates.map((t) => ({ value: String(t.id), label: t.name }))]}
-              placeholder="Select an option"
-              searchable
-              className="mb-1"
-            />
-            <p className="mb-4 text-[12px] text-gray-500">Leave blank to write it from scratch.</p>
+            <label className="mb-1 block text-[13px] font-medium text-gray-950">What should it start from?</label>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setAddFrom("fresh"); setAddTemplateId(""); }}
+                className={`rounded-lg p-3 text-left transition-all ${addFrom === "fresh" ? "bg-[#054B70]/5 ring-2 ring-[#054B70]" : "bg-white ring-1 ring-gray-950/10 hover:ring-gray-950/20"}`}
+              >
+                <span className={`block text-[13px] font-semibold ${addFrom === "fresh" ? "text-[#054B70]" : "text-gray-950"}`}>Write a fresh email</span>
+                <span className="mt-0.5 block text-[11px] text-gray-500">Start empty — the editor opens right after.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddFrom("template")}
+                className={`rounded-lg p-3 text-left transition-all ${addFrom === "template" ? "bg-[#054B70]/5 ring-2 ring-[#054B70]" : "bg-white ring-1 ring-gray-950/10 hover:ring-gray-950/20"}`}
+              >
+                <span className={`block text-[13px] font-semibold ${addFrom === "template" ? "text-[#054B70]" : "text-gray-950"}`}>Use a saved template</span>
+                <span className="mt-0.5 block text-[11px] text-gray-500">Copy one from your Template Library.</span>
+              </button>
+            </div>
+            {addFrom === "template" && (
+              <>
+                <label className="mb-1 block text-[13px] font-medium text-gray-950">
+                  Which template? <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={addTemplateId}
+                  onChange={setAddTemplateId}
+                  options={libraryTemplates.map((t) => ({ value: String(t.id), label: t.name }))}
+                  placeholder="Select a template…"
+                  searchable
+                  className="mb-1"
+                />
+                <p className="mb-4 text-[12px] text-gray-500">It&apos;s copied in — you can still tweak it afterwards.</p>
+              </>
+            )}
 
             {board.length > 0 && (
               <fieldset className="mb-4 rounded-lg border border-gray-200 p-4">
@@ -2042,7 +2071,7 @@ function EmailTemplatesPageInner() {
             <div className="flex gap-2">
               <button
                 onClick={addTouchpoint}
-                disabled={addBusy}
+                disabled={addBusy || (addFrom === "template" && !addTemplateId)}
                 className="btn-press rounded-lg bg-[#054B70] px-6 py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
               >
                 {addBusy ? "Adding…" : "Add email"}
@@ -2165,16 +2194,41 @@ function EmailTemplatesPageInner() {
               Sent once, automatically, when someone opts out right after this touchpoint. Leave the opt-out sentence blank — they have already opted out.
             </p>
 
-            <label className="mb-1 block text-[13px] font-medium text-gray-950">Copy a saved email? (optional)</label>
-            <Select
-              value={addGbTemplateId}
-              onChange={setAddGbTemplateId}
-              options={[{ value: "", label: "Select an option" }, ...libraryTemplates.map((t) => ({ value: String(t.id), label: t.name }))]}
-              placeholder="Select an option"
-              searchable
-              className="mb-1"
-            />
-            <p className="mb-4 text-[12px] text-gray-500">Leave blank to write it from scratch.</p>
+            <label className="mb-1 block text-[13px] font-medium text-gray-950">What should it start from?</label>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setGbFrom("fresh"); setAddGbTemplateId(""); }}
+                className={`rounded-lg p-3 text-left transition-all ${gbFrom === "fresh" ? "bg-[#054B70]/5 ring-2 ring-[#054B70]" : "bg-white ring-1 ring-gray-950/10 hover:ring-gray-950/20"}`}
+              >
+                <span className={`block text-[13px] font-semibold ${gbFrom === "fresh" ? "text-[#054B70]" : "text-gray-950"}`}>Write a fresh email</span>
+                <span className="mt-0.5 block text-[11px] text-gray-500">Start empty — the editor opens right after.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGbFrom("template")}
+                className={`rounded-lg p-3 text-left transition-all ${gbFrom === "template" ? "bg-[#054B70]/5 ring-2 ring-[#054B70]" : "bg-white ring-1 ring-gray-950/10 hover:ring-gray-950/20"}`}
+              >
+                <span className={`block text-[13px] font-semibold ${gbFrom === "template" ? "text-[#054B70]" : "text-gray-950"}`}>Use a saved template</span>
+                <span className="mt-0.5 block text-[11px] text-gray-500">Copy one from your Template Library.</span>
+              </button>
+            </div>
+            {gbFrom === "template" && (
+              <>
+                <label className="mb-1 block text-[13px] font-medium text-gray-950">
+                  Which template? <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={addGbTemplateId}
+                  onChange={setAddGbTemplateId}
+                  options={libraryTemplates.map((t) => ({ value: String(t.id), label: t.name }))}
+                  placeholder="Select a template…"
+                  searchable
+                  className="mb-1"
+                />
+                <p className="mb-4 text-[12px] text-gray-500">It&apos;s copied in — you can still tweak it afterwards.</p>
+              </>
+            )}
 
             <div className="flex gap-2">
               <button
@@ -2184,7 +2238,8 @@ function EmailTemplatesPageInner() {
                   setAddGbFor(null);
                   openGoodbye(forTp, tplId || undefined);
                 }}
-                className="btn-press rounded-lg bg-[#054B70] px-5 py-2.5 text-[12px] font-bold text-white"
+                disabled={gbFrom === "template" && !addGbTemplateId}
+                className="btn-press rounded-lg bg-[#054B70] px-5 py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
               >
                 Add email
               </button>
