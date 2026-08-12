@@ -52,6 +52,11 @@ interface Stats {
   recent_jobs: { id: number; touchpoint_number: number; status: string; sent_count: number; failed_count: number; created_at: string }[];
   daily_chart: { date: string; sent: number; failed: number; rate: number }[];
   positive_replies: number;
+  filter_options?: {
+    groups: { id: number; name: string }[];
+    segments: { id: number; name: string; group_name: string }[];
+    tags: { id: number; name: string }[];
+  };
 }
 
 const GRADE_WORDS: Record<string, string> = {
@@ -89,10 +94,18 @@ function ReportingPageInner() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [campaignFocus, setCampaignFocus] = useState("");
+  const [groupFocus, setGroupFocus] = useState("");
+  const [segmentFocus, setSegmentFocus] = useState("");
+  const [tagFocus, setTagFocus] = useState("");
 
-  const fetchStats = useCallback(async (campaignId?: string) => {
+  const fetchStats = useCallback(async (f: { campaign?: string; group?: string; segment?: string; tag?: string }) => {
     try {
-      const qs = campaignId ? `?campaign_id=${campaignId}` : "";
+      const p = new URLSearchParams();
+      if (f.campaign) p.set("campaign_id", f.campaign);
+      if (f.group) p.set("import_group", f.group);
+      if (f.segment) p.set("segment_id", f.segment);
+      if (f.tag) p.set("tag_id", f.tag);
+      const qs = p.toString() ? `?${p}` : "";
       const res = await fetch(`${API}/reporting/stats/${qs}`, { credentials: "include" });
       const data = await res.json();
       if (data.ok) setStats(data);
@@ -104,8 +117,28 @@ function ReportingPageInner() {
   useEffect(() => {
     const cid = searchParams.get("campaign_id") || "";
     setCampaignFocus(cid);
-    fetchStats(cid || undefined);
+    fetchStats({ campaign: cid || undefined });
   }, [searchParams, fetchStats]);
+
+  // One place to change any filter: updates state and refetches with the full set
+  function applyFilters(next: { campaign?: string; group?: string; segment?: string; tag?: string }) {
+    const f = {
+      campaign: next.campaign ?? campaignFocus,
+      group: next.group ?? groupFocus,
+      segment: next.segment ?? segmentFocus,
+      tag: next.tag ?? tagFocus,
+    };
+    if (next.campaign !== undefined) setCampaignFocus(next.campaign);
+    if (next.group !== undefined) setGroupFocus(next.group);
+    if (next.segment !== undefined) setSegmentFocus(next.segment);
+    if (next.tag !== undefined) setTagFocus(next.tag);
+    fetchStats({
+      campaign: f.campaign || undefined,
+      group: f.group || undefined,
+      segment: f.segment || undefined,
+      tag: f.tag || undefined,
+    });
+  }
 
   if (authLoading) {
     return (
@@ -192,11 +225,43 @@ function ReportingPageInner() {
                 </span>
                 <Select
                   value={campaignFocus}
-                  onChange={(v) => { setCampaignFocus(v); fetchStats(v || undefined); }}
+                  onChange={(v) => applyFilters({ campaign: v })}
                   options={[{ value: "", label: "Most active campaign" }, ...r.scorecard.map((c) => ({ value: String(c.id), label: c.name }))]}
                   size="sm"
                   className="min-w-[12rem]"
                 />
+                <Select
+                  value={groupFocus}
+                  onChange={(v) => applyFilters({ group: v, segment: "" })}
+                  options={[{ value: "", label: "All groups" }, ...(r.filter_options?.groups || []).map((g) => ({ value: String(g.id), label: g.name }))]}
+                  size="sm"
+                  searchable
+                  className="min-w-[10rem]"
+                />
+                <Select
+                  value={segmentFocus}
+                  onChange={(v) => applyFilters({ segment: v })}
+                  options={[{ value: "", label: "All segments" }, ...(r.filter_options?.segments || []).map((s) => ({ value: String(s.id), label: `${s.name} (${s.group_name})` }))]}
+                  size="sm"
+                  searchable
+                  className="min-w-[10rem]"
+                />
+                <Select
+                  value={tagFocus}
+                  onChange={(v) => applyFilters({ tag: v })}
+                  options={[{ value: "", label: "All tags" }, ...(r.filter_options?.tags || []).map((t) => ({ value: String(t.id), label: t.name }))]}
+                  size="sm"
+                  searchable
+                  className="min-w-[9rem]"
+                />
+                {(campaignFocus || groupFocus || segmentFocus || tagFocus) && (
+                  <button
+                    onClick={() => applyFilters({ campaign: "", group: "", segment: "", tag: "" })}
+                    className="rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
 
               {/* 1 · Results at a glance */}

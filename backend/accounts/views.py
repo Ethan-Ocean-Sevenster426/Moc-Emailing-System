@@ -26,6 +26,7 @@ from .models import (
     TouchpointTemplate, UserProfile, OTP, ImportGroup, Segment, Contact,
     SendJob, SendLog, SavedTestEmail, EmailTemplate, CustomField,
     ReactivationRequest, FlowTemplate, ScheduledSend, Campaign, CampaignGroup,
+    Tag,
 )
 
 
@@ -2095,7 +2096,7 @@ def contacts_list(request):
     group_filter = request.GET.get('import_group', '')
     segment_filter = request.GET.get('segment', '')
 
-    qs = Contact.objects.select_related('import_group', 'segment', 'last_campaign')
+    qs = Contact.objects.select_related('import_group', 'segment', 'last_campaign').prefetch_related('tags')
     if status_filter:
         # 'undeliverable' also covers legacy/SES 'bounced'
         if status_filter == 'undeliverable':
@@ -2152,6 +2153,7 @@ def contacts_list(request):
             'import_group_name': c.import_group.name if c.import_group else None,
             'segment_id': c.segment_id,
             'segment_name': c.segment.name if c.segment else None,
+            'tags': [{'id': t.id, 'name': t.name} for t in c.tags.all()],
             'custom_data': c.custom_data or {},
             'created_at': c.created_at.isoformat(),
             'updated_at': c.updated_at.isoformat(),
@@ -2197,6 +2199,10 @@ def contacts_list(request):
         },
         'import_groups': groups,
         'segments': segments,
+        'tags': [
+            {'id': t.id, 'name': t.name, 'contact_count': t.n}
+            for t in Tag.objects.annotate(n=Count('contacts')).order_by('name')
+        ],
         'custom_fields': list(CustomField.objects.values_list('name', flat=True)),
         'pending_approvals': ReactivationRequest.objects.filter(status='pending').count(),
     })
@@ -2879,6 +2885,24 @@ def contacts_import_csv(request):
             import_group=import_group, name=segment_name,
         )
 
+    # Tags for this upload: existing ids and/or new names (both JSON lists) —
+    # applied to every contact the upload creates or touches.
+    tags = []
+    try:
+        tag_ids = json.loads(request.POST.get('tag_ids', '[]'))
+        new_tags = json.loads(request.POST.get('new_tags', '[]'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid tags'}, status=400)
+    for tid in (tag_ids if isinstance(tag_ids, list) else []):
+        t = Tag.objects.filter(id=tid).first()
+        if t:
+            tags.append(t)
+    for tname in (new_tags if isinstance(new_tags, list) else []):
+        tname = str(tname).strip()[:100]
+        if tname:
+            t, _ = Tag.objects.get_or_create(name=tname)
+            tags.append(t)
+
     try:
         headers, rows = _parse_upload_rows(csv_file)
     except Exception as e:
@@ -2983,12 +3007,15 @@ def contacts_import_csv(request):
                 fields.append('custom_data')
             if fields:
                 existing.save(update_fields=fields + ['updated_at'])
+            if tags:
+                existing.tags.add(*tags)
+            if fields or tags:
                 updated += 1
             else:
                 skipped += 1
             continue
         try:
-            Contact.objects.create(
+            new_contact = Contact.objects.create(
                 org_name=rec.get('org_name', ''),
                 contact_name=rec.get('contact_name', ''),
                 email=email,
@@ -2998,6 +3025,8 @@ def contacts_import_csv(request):
                 import_group=import_group,
                 segment=segment,
             )
+            if tags:
+                new_contact.tags.add(*tags)
             created += 1
         except Exception as e:
             errors.append(f'Row {i}: {e}')
@@ -4041,6 +4070,8 @@ def reporting_stats(request):
     filter_from = request.GET.get('date_from')      # YYYY-MM-DD
     filter_to = request.GET.get('date_to')          # YYYY-MM-DD
     filter_campaign = request.GET.get('campaign_id')  # scope sends to one campaign
+    filter_segment = request.GET.get('segment_id')  # scope to one segment's contacts
+    filter_tag = request.GET.get('tag_id')          # scope to contacts carrying a tag
 
     # Build base querysets with filters applied
     job_qs = SendJob.objects.all()
@@ -4065,6 +4096,22 @@ def reporting_stats(request):
         job_ids = log_qs.values_list('job_id', flat=True).distinct()
         job_qs = job_qs.filter(id__in=job_ids)
 
+    if filter_segment:
+        try:
+            log_qs = log_qs.filter(contact__segment_id=int(filter_segment))
+            contact_qs = contact_qs.filter(segment_id=int(filter_segment))
+            job_qs = job_qs.filter(id__in=log_qs.values_list('job_id', flat=True).distinct())
+        except (TypeError, ValueError):
+            pass
+
+    if filter_tag:
+        try:
+            log_qs = log_qs.filter(contact__tags__id=int(filter_tag))
+            contact_qs = contact_qs.filter(tags__id=int(filter_tag))
+            job_qs = job_qs.filter(id__in=log_qs.values_list('job_id', flat=True).distinct())
+        except (TypeError, ValueError):
+            pass
+
     if filter_from:
         d = datetime.strptime(filter_from, '%Y-%m-%d').date()
         job_qs = job_qs.filter(created_at__date__gte=d)
@@ -4075,8 +4122,8 @@ def reporting_stats(request):
         job_qs = job_qs.filter(created_at__date__lte=d)
         log_qs = log_qs.filter(sent_at__date__lte=d)
 
-    # When filtering by group or date, compute totals from SendLog instead of SendJob aggregates
-    if filter_group or filter_from or filter_to:
+    # When filtering by contact scope or date, compute totals from SendLog instead of SendJob aggregates
+    if filter_group or filter_segment or filter_tag or filter_from or filter_to:
         total_jobs = job_qs.count()
         total_sent = log_qs.filter(status='sent').count()
         total_failed = log_qs.filter(status='failed').count()
@@ -4462,6 +4509,14 @@ def reporting_stats(request):
         'import_groups': groups,
         'segments': segment_stats,
         'positive_replies': total_positive_replies,
+        'filter_options': {
+            'groups': groups,
+            'segments': [
+                {'id': s['id'], 'name': s['name'], 'group_name': s['import_group__name']}
+                for s in Segment.objects.select_related('import_group').values('id', 'name', 'import_group__name').order_by('name')
+            ],
+            'tags': list(Tag.objects.values('id', 'name').order_by('name')),
+        },
     })
 
 

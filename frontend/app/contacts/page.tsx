@@ -29,9 +29,16 @@ interface Contact {
   import_group_name: string | null;
   segment_id: number | null;
   segment_name: string | null;
+  tags: { id: number; name: string }[];
   custom_data: Record<string, string>;
   created_at: string;
   updated_at: string;
+}
+
+interface TagInfo {
+  id: number;
+  name: string;
+  contact_count: number;
 }
 
 interface ImportPreview {
@@ -202,6 +209,10 @@ export default function ContactsPage() {
   const [removeFieldName, setRemoveFieldName] = useState("");
   const [showNewTag, setShowNewTag] = useState(false);
   const [importTagName, setImportTagName] = useState("");
+  // Real tags: available list + this upload's picks (existing ids and brand-new names)
+  const [allTags, setAllTags] = useState<TagInfo[]>([]);
+  const [importTagIds, setImportTagIds] = useState<string[]>([]);
+  const [importNewTags, setImportNewTags] = useState<string[]>([]);
 
   // Beacon table chrome: filter popover, "Groups & segments" panel, row menus, org opt-out
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -243,6 +254,7 @@ export default function ContactsPage() {
         setCounts(data.counts);
         if (data.import_groups) setImportGroups(data.import_groups);
         if (data.segments) setSegments(data.segments);
+        if (data.tags) setAllTags(data.tags);
         if (data.custom_fields) setCustomFields(data.custom_fields);
         if (typeof data.pending_approvals === "number") setPendingCount(data.pending_approvals);
       }
@@ -515,6 +527,10 @@ export default function ContactsPage() {
     setImportGroupName("");
     setImportSegmentId("");
     setImportSegmentName("");
+    setImportTagIds([]);
+    setImportNewTags([]);
+    setImportTagName("");
+    setShowNewTag(false);
     setShowImportModal(true);
   }
 
@@ -629,6 +645,9 @@ export default function ContactsPage() {
     } else if (importSegmentId && importSegmentId !== "new") {
       fd.append("segment_id", importSegmentId);
     }
+    // Tags for this upload: existing picks + brand-new names
+    if (importTagIds.length) fd.append("tag_ids", JSON.stringify(importTagIds.map(Number)));
+    if (importNewTags.length) fd.append("new_tags", JSON.stringify(importNewTags));
     try {
       const res = await fetch(`${API}/contacts/import/`, { method: "POST", body: fd, credentials: "include" });
       const data = await res.json();
@@ -1262,7 +1281,17 @@ export default function ContactsPage() {
                         <td className="hidden px-3 py-3 text-[13px] text-gray-400 lg:table-cell sm:px-4">—</td>
                       )}
                       {(visibleCols.tags ?? true) && (
-                        <td className="hidden px-3 py-3 text-[13px] text-gray-400 lg:table-cell sm:px-4">—</td>
+                        <td className="hidden px-3 py-3 lg:table-cell sm:px-4">
+                          {c.tags && c.tags.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {c.tags.map((t) => (
+                                <span key={t.id} className="rounded-full bg-[#054B70]/5 px-2 py-0.5 text-[11px] font-semibold text-[#054B70]">{t.name}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[13px] text-gray-400">—</span>
+                          )}
+                        </td>
                       )}
                       {(visibleCols.segment ?? false) && (
                         <td className="hidden px-3 py-3 text-[13px] text-gray-950 lg:table-cell sm:px-4">
@@ -1627,7 +1656,15 @@ export default function ContactsPage() {
                       Tag this upload <span className="font-normal text-gray-400">(optional)</span>
                     </label>
                     <div className="flex gap-2">
-                      <Select options={[]} placeholder="Select an option" className="flex-1" />
+                      <Select
+                        multiple
+                        searchable
+                        values={importTagIds}
+                        onToggle={(v) => setImportTagIds((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])}
+                        options={allTags.map((t) => ({ value: String(t.id), label: t.name }))}
+                        placeholder="Select an option"
+                        className="flex-1"
+                      />
                       <button
                         type="button"
                         title="Create a new tag"
@@ -1644,11 +1681,37 @@ export default function ContactsPage() {
                         type="text"
                         value={importTagName}
                         onChange={(e) => setImportTagName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); showToast("Tags aren't available yet."); } }}
-                        placeholder="e.g. Q3 upload"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const name = importTagName.trim();
+                            if (!name) return;
+                            setImportNewTags((prev) => prev.includes(name) ? prev : [...prev, name]);
+                            setImportTagName("");
+                            setShowNewTag(false);
+                          }
+                        }}
+                        placeholder="e.g. Q3 upload — Enter to add"
                         className="input-glow mt-2 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-[13px] text-gray-900 placeholder-gray-400 outline-none"
                         autoFocus
                       />
+                    )}
+                    {importNewTags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {importNewTags.map((t) => (
+                          <span key={t} className="inline-flex items-center gap-1 rounded-full bg-[#054B70]/5 px-2.5 py-1 text-[11px] font-semibold text-[#054B70]">
+                            {t}
+                            <button
+                              type="button"
+                              title="Remove this new tag"
+                              onClick={() => setImportNewTags((prev) => prev.filter((x) => x !== t))}
+                              className="font-bold hover:opacity-70"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
                     )}
                     <p className="mt-1.5 text-[12px] text-gray-500">Add tags to every contact in this upload — pick existing ones or create a new one with +.</p>
                   </div>

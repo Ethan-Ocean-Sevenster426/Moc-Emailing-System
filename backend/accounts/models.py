@@ -258,6 +258,20 @@ class CustomField(models.Model):
         return self.name
 
 
+class Tag(models.Model):
+    """A freeform label contacts carry — applied to a whole upload at import
+    time (\"Tag this upload\") and usable as a reporting filter."""
+    name = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tags'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Contact(models.Model):
     STATUS_CHOICES = [
         ('active', 'Active'),
@@ -289,6 +303,7 @@ class Contact(models.Model):
     segment = models.ForeignKey(
         'Segment', on_delete=models.SET_NULL, null=True, blank=True, related_name='contacts',
     )
+    tags = models.ManyToManyField('Tag', blank=True, related_name='contacts')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
