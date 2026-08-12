@@ -3593,6 +3593,7 @@ def _run_scheduled_send(ss_id):
     if job:
         ScheduledSend.objects.filter(id=ss_id).update(send_job=job)
     print(f'[SCHEDULE] Scheduled send #{ss_id} ran: eligible={total_eligible}, batch={batch}, job={job.id if job else None}', flush=True)
+    return job, total_eligible, batch
 
 
 def _process_due_scheduled_sends():
@@ -3794,6 +3795,7 @@ def schedules_schedule_campaign(request):
             created_by=request.user,
         ))
 
+    started = None
     if run_now:
         first = rows[0]
         # A first step pinned to a future date stays scheduled instead of firing now
@@ -3802,7 +3804,8 @@ def schedules_schedule_campaign(request):
             claimed = ScheduledSend.objects.filter(id=first.id, status='scheduled').update(status='sent')
         if claimed:
             try:
-                _run_scheduled_send(first.id)
+                job, total_eligible, batch = _run_scheduled_send(first.id)
+                started = {'job_id': job.id if job else None, 'recipients': batch, 'eligible': total_eligible}
             except Exception as e:
                 print(f'[SCHEDULE] Run-now launch failed for batch {batch_key}: {e}', flush=True)
 
@@ -3812,6 +3815,7 @@ def schedules_schedule_campaign(request):
         'scheduled': len(rows),
         'skipped': skipped,
         'ran_now': run_now,
+        'started': started,
     })
 
 
@@ -4044,11 +4048,19 @@ def send_bulk_start(request):
 
 def _eligible_contacts_for_send(tp_num, data, campaign=None):
     """Contacts eligible to receive touchpoint `tp_num` — active and currently at
-    TP(N-1) on this campaign's journey (TP1 starts anyone not mid-journey),
-    optionally narrowed by import group and/or segment(s)."""
-    qs = Contact.objects.filter(status='active', last_touchpoint=int(tp_num) - 1)
-    if campaign is not None and int(tp_num) > 1:
-        qs = qs.filter(last_campaign=campaign)
+    TP(N-1) on this campaign's journey, optionally narrowed by import group,
+    segment(s) and/or tag. Touchpoint 1 starts fresh contacts AND anyone whose
+    journey belongs to a different campaign (starting this one resets them)."""
+    from django.db.models import Q
+    tp_num = int(tp_num)
+    if tp_num == 1 and campaign is not None:
+        qs = Contact.objects.filter(status='active').filter(
+            Q(last_touchpoint=0) | ~Q(last_campaign=campaign) | Q(last_campaign__isnull=True)
+        )
+    else:
+        qs = Contact.objects.filter(status='active', last_touchpoint=tp_num - 1)
+        if campaign is not None and tp_num > 1:
+            qs = qs.filter(last_campaign=campaign)
     group_id = data.get('import_group_id')
     if group_id:
         qs = qs.filter(import_group_id=group_id)
