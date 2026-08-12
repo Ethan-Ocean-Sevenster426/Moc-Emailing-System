@@ -48,6 +48,8 @@ export default function UsersPage() {
   const [editRole, setEditRole] = useState("viewer");
   const [savingEdit, setSavingEdit] = useState(false);
   const [resending, setResending] = useState(false);
+  const [busyAction, setBusyAction] = useState<"" | "reset" | "active" | "delete">("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (authUser) fetchUsers();
@@ -133,6 +135,68 @@ export default function UsersPage() {
       showToast("Network error", false);
     }
     setResending(false);
+  }
+
+  async function sendReset() {
+    if (!editing) return;
+    setBusyAction("reset");
+    try {
+      const res = await fetch(`${API}/users/send-reset/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: editing.id }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      showToast(data.ok ? data.message : (data.error || "Could not send"), Boolean(data.ok));
+    } catch {
+      showToast("Network error", false);
+    }
+    setBusyAction("");
+  }
+
+  async function toggleActive() {
+    if (!editing) return;
+    setBusyAction("active");
+    try {
+      const res = await fetch(`${API}/users/set-active/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: editing.id, active: !editing.is_active }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message, true);
+        setEditing(null);
+        fetchUsers();
+      } else showToast(data.error || "Could not change", false);
+    } catch {
+      showToast("Network error", false);
+    }
+    setBusyAction("");
+  }
+
+  async function deleteUser() {
+    if (!editing) return;
+    setBusyAction("delete");
+    try {
+      const res = await fetch(`${API}/users/delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: editing.id }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("User deleted", true);
+        setEditing(null);
+        fetchUsers();
+      } else showToast(data.error || "Could not delete", false);
+    } catch {
+      showToast("Network error", false);
+    }
+    setBusyAction("");
   }
 
   if (authLoading || !authUser) {
@@ -234,7 +298,7 @@ export default function UsersPage() {
                         <td className="px-4 py-3.5 text-right">
                           {u.role !== "admin" && (
                             <button
-                              onClick={() => { setEditing(u); setEditRole(u.role); }}
+                              onClick={() => { setEditing(u); setEditRole(u.role); setConfirmDelete(false); }}
                               className="text-[13px] font-semibold text-[#054B70] hover:underline"
                             >
                               Edit
@@ -362,6 +426,56 @@ export default function UsersPage() {
                 {resending ? "Sending…" : "Resend setup email"}
               </button>
             )}
+
+            {/* Account actions: reset password, deactivate, delete */}
+            <div className="mb-4 rounded-lg border border-gray-200 p-3">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-500">Account actions</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={sendReset}
+                  disabled={busyAction === "reset"}
+                  className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-[12px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {busyAction === "reset" ? "Sending…" : "Send password reset"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleActive}
+                  disabled={busyAction === "active"}
+                  className={`rounded-lg border px-3.5 py-2 text-[12px] font-semibold disabled:opacity-50 ${
+                    editing.is_active
+                      ? "border-amber-500/40 bg-white text-amber-700 hover:bg-amber-50"
+                      : "border-emerald-500/40 bg-white text-emerald-700 hover:bg-emerald-50"
+                  }`}
+                >
+                  {busyAction === "active" ? "Working…" : editing.is_active ? "Deactivate" : "Reactivate"}
+                </button>
+                {authUser?.role === "admin" && (
+                  confirmDelete ? (
+                    <button
+                      type="button"
+                      onClick={deleteUser}
+                      disabled={busyAction === "delete"}
+                      className="rounded-lg bg-red-600 px-3.5 py-2 text-[12px] font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {busyAction === "delete" ? "Deleting…" : "Really delete? This is permanent"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(true)}
+                      className="rounded-lg border border-red-500/40 bg-white px-3.5 py-2 text-[12px] font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  )
+                )}
+              </div>
+              <p className="mt-2 text-[11px] text-gray-500">
+                Reset emails them a code for the set-password page. Deactivated accounts can&apos;t sign in until reactivated. Delete removes the account for good.
+              </p>
+            </div>
 
             <div className="flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>

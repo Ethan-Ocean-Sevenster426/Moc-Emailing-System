@@ -973,9 +973,75 @@ def users_delete(request):
 
     if target_user.id == request.user.id:
         return JsonResponse({'error': 'Cannot delete your own account'}, status=400)
+    profile = getattr(target_user, 'profile', None)
+    if profile and profile.role == 'admin':
+        return JsonResponse({'error': 'Admin accounts cannot be deleted here'}, status=400)
 
     target_user.delete()
     return JsonResponse({'ok': True, 'message': 'User deleted'})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@require_role('admin', 'editor')
+def users_set_active(request):
+    """Deactivate (or reactivate) an account — a deactivated user cannot log in."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    user_id = data.get('user_id')
+    active = data.get('active')
+    if not user_id or not isinstance(active, bool):
+        return JsonResponse({'error': 'user_id and active (true/false) are required'}, status=400)
+
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
+    if target_user.id == request.user.id:
+        return JsonResponse({'error': 'Cannot deactivate your own account'}, status=400)
+    profile = getattr(target_user, 'profile', None)
+    if profile and profile.role == 'admin':
+        return JsonResponse({'error': 'Admin accounts cannot be changed here'}, status=400)
+
+    target_user.is_active = active
+    target_user.save(update_fields=['is_active'])
+    return JsonResponse({'ok': True, 'message': 'Account reactivated' if active else 'Account deactivated'})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@require_role('admin', 'editor')
+def users_send_reset(request):
+    """Email a password-reset code to a user — they finish on the set-password page."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    user_id = data.get('user_id')
+    if not user_id:
+        return JsonResponse({'error': 'user_id is required'}, status=400)
+
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    if not target_user.email:
+        return JsonResponse({'error': 'This account has no email address'}, status=400)
+
+    otp = OTP.generate(target_user, 'password_reset')
+    if otp is None:
+        return JsonResponse({"error": "Please wait before requesting a new code."}, status=429)
+
+    sent_ok, _ = _send_otp_email(target_user.email, otp.code, 'password_reset')
+    if not sent_ok:
+        return JsonResponse({"error": "Failed to send email"}, status=500)
+
+    return JsonResponse({'ok': True, 'message': f'Password reset email sent to {target_user.email}'})
 
 
 @csrf_exempt

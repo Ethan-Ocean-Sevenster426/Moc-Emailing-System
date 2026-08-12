@@ -21,6 +21,8 @@ urlpatterns = [
     path("users/create/", views.users_create, name="users_create"),
     path("users/update/", views.users_update, name="users_update"),
     path("users/delete/", views.users_delete, name="users_delete"),
+    path("users/set-active/", views.users_set_active, name="users_set_active"),
+    path("users/send-reset/", views.users_send_reset, name="users_send_reset"),
     path("users/resend-setup/", views.resend_setup_otp, name="resend_setup_otp"),
 
     # Email templates
