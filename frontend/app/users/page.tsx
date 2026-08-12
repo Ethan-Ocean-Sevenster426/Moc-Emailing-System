@@ -296,7 +296,7 @@ export default function UsersPage() {
                           )}
                         </td>
                         <td className="py-3.5 pl-4 pr-6 text-right">
-                          {u.role !== "admin" ? (
+                          {(u.role !== "admin" || authUser?.is_superuser) && u.username !== authUser?.username ? (
                             <button
                               onClick={() => { setEditing(u); setEditRole(u.role); setConfirmDelete(false); }}
                               className="text-[13px] font-semibold text-[#054B70] hover:underline"
@@ -304,7 +304,12 @@ export default function UsersPage() {
                               Edit
                             </button>
                           ) : (
-                            <span className="text-[13px] text-gray-400" title="Admin accounts are managed outside the app">—</span>
+                            <span
+                              className="text-[13px] text-gray-400"
+                              title={u.username === authUser?.username ? "This is you — your own account can't be changed here" : "Admin accounts are managed outside the app"}
+                            >
+                              —
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -416,7 +421,12 @@ export default function UsersPage() {
               className="mb-3 w-full cursor-default rounded-lg border border-gray-300 bg-gray-100 px-3 py-2.5 text-[13px] text-gray-500 outline-none"
             />
             <label className="mb-1 block text-[13px] font-medium text-gray-950">User type</label>
-            <Select value={editRole} onChange={setEditRole} options={ROLES} className="mb-4" />
+            <Select
+              value={editRole}
+              onChange={setEditRole}
+              options={authUser?.is_superuser ? [...ROLES, { value: "admin", label: "Admin" }] : ROLES}
+              className="mb-4"
+            />
 
             {!editing.is_active && (
               <button

@@ -11,6 +11,8 @@ export interface AuthUser {
   first_name: string;
   last_name: string;
   role: "admin" | "editor" | "viewer";
+  /** Super admin (set in the database): may manage admin accounts too. */
+  is_superuser?: boolean;
 }
 
 export function useAuth(requiredRole?: string | string[]) {

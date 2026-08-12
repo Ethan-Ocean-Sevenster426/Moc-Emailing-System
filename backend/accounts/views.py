@@ -823,6 +823,8 @@ def me(request):
         "first_name": request.user.first_name,
         "last_name": request.user.last_name,
         "role": role,
+        # Super admin: may manage admin accounts too (set via the database)
+        "is_superuser": bool(request.user.is_superuser),
     })
 
 
@@ -928,8 +930,10 @@ def users_update(request):
 
     if not user_id or not role:
         return JsonResponse({'error': 'user_id and role are required'}, status=400)
-    # Only editor/viewer are assignable — admin is never granted (or revoked) from the UI.
-    if role not in ('editor', 'viewer'):
+    # Only editor/viewer are assignable — except by a super admin, who may
+    # also grant (or revoke) admin.
+    allowed_roles = ('editor', 'viewer', 'admin') if request.user.is_superuser else ('editor', 'viewer')
+    if role not in allowed_roles:
         return JsonResponse({'error': 'Role must be editor or viewer'}, status=400)
 
     try:
@@ -938,7 +942,7 @@ def users_update(request):
         return JsonResponse({'error': 'User not found'}, status=404)
 
     target_profile = getattr(target_user, 'profile', None)
-    if target_profile and target_profile.role == 'admin':
+    if target_profile and target_profile.role == 'admin' and not request.user.is_superuser:
         return JsonResponse({'error': 'Admin accounts cannot be changed here'}, status=400)
     if target_user.id == request.user.id:
         return JsonResponse({'error': 'Cannot change your own role'}, status=400)
@@ -974,7 +978,7 @@ def users_delete(request):
     if target_user.id == request.user.id:
         return JsonResponse({'error': 'Cannot delete your own account'}, status=400)
     profile = getattr(target_user, 'profile', None)
-    if profile and profile.role == 'admin':
+    if profile and profile.role == 'admin' and not request.user.is_superuser:
         return JsonResponse({'error': 'Admin accounts cannot be deleted here'}, status=400)
 
     target_user.delete()
@@ -1004,7 +1008,7 @@ def users_set_active(request):
     if target_user.id == request.user.id:
         return JsonResponse({'error': 'Cannot deactivate your own account'}, status=400)
     profile = getattr(target_user, 'profile', None)
-    if profile and profile.role == 'admin':
+    if profile and profile.role == 'admin' and not request.user.is_superuser:
         return JsonResponse({'error': 'Admin accounts cannot be changed here'}, status=400)
 
     target_user.is_active = active
