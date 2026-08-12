@@ -279,7 +279,7 @@ export default function UsersPage() {
                       <th className="px-4 py-3 text-[13px] font-semibold text-gray-950">Email</th>
                       <th className="px-4 py-3 text-[13px] font-semibold text-gray-950">User type</th>
                       <th className="px-4 py-3 text-[13px] font-semibold text-gray-950">Active</th>
-                      <th className="px-4 py-3 text-right text-[13px] font-semibold text-gray-950">Actions</th>
+                      <th className="py-3 pl-4 pr-6 text-right text-[13px] font-semibold text-gray-950">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-950/5">
@@ -295,7 +295,7 @@ export default function UsersPage() {
                             <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-right">
+                        <td className="py-3.5 pl-4 pr-6 text-right">
                           {u.role !== "admin" ? (
                             <button
                               onClick={() => { setEditing(u); setEditRole(u.role); setConfirmDelete(false); }}
