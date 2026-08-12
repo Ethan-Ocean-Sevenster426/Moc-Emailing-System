@@ -67,6 +67,7 @@ const SA_TZ = "Africa/Johannesburg";
 /** Current UTC offset of a zone, e.g. "UTC+2", "UTC−4", "UTC+5:30" (DST-aware). */
 function tzOffsetLabel(zone: string): string {
   const now = new Date();
+  now.setSeconds(0, 0); // minute precision on both sides, else offsets read e.g. UTC+1:59
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone: zone, hour12: false,
     year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
@@ -2432,7 +2433,7 @@ function EmailTemplatesPageInner() {
                         onChange={(e) => setAddTime(e.target.value)}
                         className="input-glow w-32 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-950 outline-none"
                       />
-                      <Select value={addTz} onChange={setAddTz} options={TIMEZONES} searchable className="w-60" />
+                      <Select value={addTz} onChange={setAddTz} options={TIMEZONES} searchable className="w-72" />
                     </div>
                     {addTime && addTz !== SA_TZ && (
                       <p className="mb-1 text-[12px] font-semibold text-[#054B70]">
@@ -2619,7 +2620,7 @@ function EmailTemplatesPageInner() {
                 onChange={(e) => setWaitTime(e.target.value)}
                 className="input-glow w-32 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-900 outline-none"
               />
-              <Select value={waitTz} onChange={setWaitTz} options={TIMEZONES} searchable className="w-60" />
+              <Select value={waitTz} onChange={setWaitTz} options={TIMEZONES} searchable className="w-72" />
             </div>
             {waitTime && waitTz !== SA_TZ && (
               <p className="mb-1 text-[11px] font-semibold text-[#054B70]">
