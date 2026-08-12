@@ -243,9 +243,11 @@ export default function ContactsPage() {
   // keystroke, and a slow early response ("ethan") must never overwrite the
   // results of the final query ("ethansevenster5@...").
   const fetchSeqRef = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   async function fetchContacts() {
     const seq = ++fetchSeqRef.current;
+    setRefreshing(true);
     try {
       const params = new URLSearchParams();
       if (filter) params.set("status", filter);
@@ -266,6 +268,7 @@ export default function ContactsPage() {
         if (typeof data.pending_approvals === "number") setPendingCount(data.pending_approvals);
       }
     } catch { /* */ }
+    if (seq === fetchSeqRef.current) setRefreshing(false);
     setLoaded(true);
   }
 
@@ -1002,7 +1005,21 @@ export default function ContactsPage() {
               return <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${cls}`}>{label}</span>;
             };
             return (
-          <div className="rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 animate-fade-in-up -mx-4 sm:mx-0" style={{ animationDelay: "0.05s" }}>
+          <div className="relative rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 animate-fade-in-up -mx-4 sm:mx-0" style={{ animationDelay: "0.05s" }}>
+            {/* While a search/filter change is loading: dim the table and show a spinner */}
+            {refreshing && loaded && (
+              <div className="absolute inset-0 z-20 rounded-xl bg-white/70 backdrop-blur-[1.5px]">
+                <div className="sticky top-40 flex justify-center pt-10">
+                  <div className="flex items-center gap-3 rounded-xl bg-white px-5 py-3.5 shadow-lg ring-1 ring-gray-950/10">
+                    <svg className="h-5 w-5 animate-spin text-[#054B70]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-[13px] font-semibold text-gray-700">Applying filters…</span>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Toolbar */}
             <div className="relative flex flex-wrap items-center justify-between gap-2 border-b border-gray-950/5 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
