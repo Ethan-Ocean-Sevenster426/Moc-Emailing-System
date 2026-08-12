@@ -60,6 +60,43 @@ interface LibraryTemplate {
 
 const DEFAULT_OPT_OUT_TEXT = "If you'd prefer not to receive further communication from us, you can opt out here.";
 
+// Timezones the "Then send at" clock can be entered in. Sends always run on
+// South Africa time — other zones are converted before saving.
+const SA_TZ = "Africa/Johannesburg";
+const TIMEZONES = [
+  { value: SA_TZ, label: "South Africa (SAST)" },
+  { value: "Europe/London", label: "United Kingdom (London)" },
+  { value: "Europe/Paris", label: "Central Europe (Paris / Berlin)" },
+  { value: "America/New_York", label: "US Eastern (New York)" },
+  { value: "America/Chicago", label: "US Central (Chicago)" },
+  { value: "America/Denver", label: "US Mountain (Denver)" },
+  { value: "America/Los_Angeles", label: "US Pacific (Los Angeles)" },
+  { value: "Asia/Dubai", label: "UAE (Dubai)" },
+  { value: "Asia/Kolkata", label: "India (Mumbai)" },
+  { value: "Asia/Singapore", label: "Singapore / Hong Kong" },
+  { value: "Australia/Sydney", label: "Australia (Sydney)" },
+  { value: "UTC", label: "UTC" },
+];
+
+/** Convert an HH:MM wall-clock in `tz` (on dateStr, or today) to the same
+ *  instant's HH:MM in South Africa time — DST-aware via Intl. */
+function toSaTime(time: string, tz: string, dateStr?: string): string {
+  if (!time || tz === SA_TZ) return time;
+  const [h, m] = time.split(":").map(Number);
+  const base = dateStr ? new Date(`${dateStr}T12:00:00Z`) : new Date();
+  const zoneOffsetMs = (zone: string) => {
+    const dtf = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, hour12: false,
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+    });
+    const p = Object.fromEntries(dtf.formatToParts(base).map((x) => [x.type, x.value]));
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute) - base.getTime();
+  };
+  const diffMin = Math.round((zoneOffsetMs(SA_TZ) - zoneOffsetMs(tz)) / 60000);
+  const total = (((h * 60 + m + diffMin) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 const EMPTY_TEMPLATE: Omit<Template, "touchpoint_number"> = {
   subject: "",
   body: "",
@@ -195,6 +232,7 @@ function EmailTemplatesPageInner() {
   const [addAfter, setAddAfter] = useState("0");
   const [addParts, setAddParts] = useState<WaitParts>(EMPTY_WAIT);
   const [addTime, setAddTime] = useState("");
+  const [addTz, setAddTz] = useState(SA_TZ);
   const [addDate, setAddDate] = useState("");
   // Whether this email waits at all — "no" (the default) collapses the wait
   // menu and sends immediately after the previous email
@@ -208,6 +246,7 @@ function EmailTemplatesPageInner() {
     setAddAfter(String(board.length ? board[board.length - 1].touchpoint_number : 0));
     setAddParts({ months: 0, weeks: 0, days: 0, hours: 0, minutes: 0 });
     setAddTime("");
+    setAddTz(SA_TZ);
     setAddDate("");
     setAddWait(false);
     setAddTemplateId("");
@@ -225,7 +264,7 @@ function EmailTemplatesPageInner() {
           campaign_id: campaignId || undefined,
           after: Number(addAfter),
           ...addParts,
-          send_time: addTime,
+          send_time: addTime ? toSaTime(addTime, addTz, addDate || undefined) : "",
           send_date: addDate,
           template_id: addTemplateId ? Number(addTemplateId) : undefined,
         }),
@@ -358,12 +397,14 @@ function EmailTemplatesPageInner() {
   const [waitTp, setWaitTp] = useState<number | null>(null);
   const [waitParts, setWaitParts] = useState<WaitParts>(EMPTY_WAIT);
   const [waitTime, setWaitTime] = useState("");
+  const [waitTz, setWaitTz] = useState(SA_TZ);
   const [waitDate, setWaitDate] = useState("");
 
   function openWaitEditor(bt: BoardTP) {
     setWaitTp(bt.touchpoint_number);
     setWaitParts({ ...bt.wait_parts });
     setWaitTime(bt.send_time || "");
+    setWaitTz(SA_TZ); // stored times are SAST
     setWaitDate(bt.scheduled_date || "");
   }
   const [delTp, setDelTp] = useState<number | null>(null);
@@ -399,7 +440,7 @@ function EmailTemplatesPageInner() {
         body: JSON.stringify({
           touchpoint_number: waitTp,
           ...waitParts,
-          send_time: waitTime,
+          send_time: waitTime ? toSaTime(waitTime, waitTz, waitDate || undefined) : "",
           send_date: waitDate,
           campaign_id: campaignId || undefined,
         }),
@@ -2369,14 +2410,22 @@ function EmailTemplatesPageInner() {
                       ))}
                     </div>
                     <label className="mb-1 block text-[13px] font-medium text-gray-950">Then send at (optional)</label>
-                    <input
-                      type="time"
-                      value={addTime}
-                      onChange={(e) => setAddTime(e.target.value)}
-                      className="input-glow mb-1 w-40 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-950 outline-none"
-                    />
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <input
+                        type="time"
+                        value={addTime}
+                        onChange={(e) => setAddTime(e.target.value)}
+                        className="input-glow w-32 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-950 outline-none"
+                      />
+                      <Select value={addTz} onChange={setAddTz} options={TIMEZONES} searchable className="w-60" />
+                    </div>
+                    {addTime && addTz !== SA_TZ && (
+                      <p className="mb-1 text-[12px] font-semibold text-[#054B70]">
+                        {addTime} {TIMEZONES.find((t) => t.value === addTz)?.label} = {toSaTime(addTime, addTz, addDate || undefined)} in South Africa (SAST) — it sends at that SA time.
+                      </p>
+                    )}
                     <p className="text-[12px] text-gray-500">
-                      Combine units freely — e.g. 1 week and 3 days. The time pins the clock, e.g. at 9:00 AM South Africa time (SAST).
+                      Combine units freely — e.g. 1 week and 3 days. The time pins the clock in the timezone you pick.
                     </p>
                     <label className="mb-1 mt-3 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
                     <DatePicker value={addDate} onChange={setAddDate} placeholder="Pick a date…" className="mb-1 w-52" />
@@ -2548,14 +2597,22 @@ function EmailTemplatesPageInner() {
               ))}
             </div>
             <label className="mb-1 block text-[13px] font-medium text-gray-950">Then send at (optional)</label>
-            <input
-              type="time"
-              value={waitTime}
-              onChange={(e) => setWaitTime(e.target.value)}
-              className="input-glow mb-1 w-40 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-900 outline-none"
-            />
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <input
+                type="time"
+                value={waitTime}
+                onChange={(e) => setWaitTime(e.target.value)}
+                className="input-glow w-32 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-900 outline-none"
+              />
+              <Select value={waitTz} onChange={setWaitTz} options={TIMEZONES} searchable className="w-60" />
+            </div>
+            {waitTime && waitTz !== SA_TZ && (
+              <p className="mb-1 text-[11px] font-semibold text-[#054B70]">
+                {waitTime} {TIMEZONES.find((t) => t.value === waitTz)?.label} = {toSaTime(waitTime, waitTz, waitDate || undefined)} in South Africa (SAST) — it sends at that SA time.
+              </p>
+            )}
             <p className="mb-3 text-[11px] text-gray-500">
-              Pins the clock time — e.g. wait 1 week and 3 days, then send at 9:00 AM South Africa time (SAST). Blank = exactly after the wait.
+              Pins the clock time in the timezone you pick. Blank = exactly after the wait.
             </p>
             <label className="mb-1 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
             <DatePicker value={waitDate} onChange={setWaitDate} placeholder="Pick a date…" className="mb-1 w-52" />
