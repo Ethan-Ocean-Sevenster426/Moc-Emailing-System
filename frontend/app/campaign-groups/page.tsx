@@ -690,26 +690,30 @@ export default function CampaignGroupsPage() {
               className="input-glow mb-3 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-[13px] text-gray-950 outline-none"
             />
 
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">
-              Group <span className="text-red-500">*</span>
-            </label>
-            <Select
-              value={cGroupId}
-              onChange={setCGroupId}
-              disabled={!!editingCampaign}
-              className="mb-3 w-full"
-              options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
-              placeholder="Pick a group…"
-            />
+            {editingCampaign && (
+              <>
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                  Group <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={cGroupId}
+                  onChange={setCGroupId}
+                  disabled
+                  className="mb-3 w-full"
+                  options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
+                  placeholder="Pick a group…"
+                />
 
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Audience (segment)</label>
-            <Select
-              value={cSegmentId}
-              onChange={setCSegmentId}
-              className="mb-1 w-full"
-              options={[{ value: "", label: "Select an option" }, ...segments.map((s) => ({ value: String(s.id), label: s.name }))]}
-            />
-            <p className="mb-3 text-[11px] text-gray-500">Who this campaign is for. Pre-filled on every send; optional.</p>
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Audience (segment)</label>
+                <Select
+                  value={cSegmentId}
+                  onChange={setCSegmentId}
+                  className="mb-1 w-full"
+                  options={[{ value: "", label: "Select an option" }, ...segments.map((s) => ({ value: String(s.id), label: s.name }))]}
+                />
+                <p className="mb-3 text-[11px] text-gray-500">Who this campaign is for. Pre-filled on every send; optional.</p>
+              </>
+            )}
 
             <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Notes (optional)</label>
             <textarea
