@@ -1222,12 +1222,12 @@ function EmailTemplatesPageInner() {
                                 </span>
                               </button>
                             )}
-                            {configured ? (
+                            {renameTp !== n && (configured ? (
                               <span className="shrink-0 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-700">Ready</span>
                             ) : (
                               <span className="shrink-0 rounded-full bg-gray-400/15 px-2 py-0.5 text-[10px] font-semibold text-gray-500">Empty</span>
-                            )}
-                            {canEdit && (
+                            ))}
+                            {renameTp !== n && canEdit && (
                               <div className="flex shrink-0 gap-1.5">
                                 <button
                                   type="button"
