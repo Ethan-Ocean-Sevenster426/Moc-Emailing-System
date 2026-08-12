@@ -3821,6 +3821,8 @@ def schedules_schedule_campaign(request):
     prev_when = launch
     for i, step in enumerate(steps):
         when = launch if i == 0 else prev_when + td(minutes=step.wait_in_minutes())
+        # Pins are wall-clock in local (South Africa) time
+        when = timezone.localtime(when)
         if step.scheduled_date:
             # A pinned calendar date overrides the relative wait
             when = when.replace(year=step.scheduled_date.year, month=step.scheduled_date.month, day=step.scheduled_date.day)

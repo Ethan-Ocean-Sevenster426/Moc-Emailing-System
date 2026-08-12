@@ -116,9 +116,12 @@ export default function DatePicker({
     const rect = wrapRef.current?.getBoundingClientRect();
     if (!rect) return;
     const left = Math.min(rect.left, window.innerWidth - PANEL_W - 8);
-    const top = rect.bottom + PANEL_H > window.innerHeight
-      ? Math.max(8, rect.top - PANEL_H - 4)
-      : rect.bottom + 4;
+    // Always open downward; when space runs out, slide up just enough to stay
+    // on screen (may cover the trigger) instead of jumping above it.
+    let top = rect.bottom + 4;
+    if (top + PANEL_H > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - PANEL_H - 8);
+    }
     setPos({ top, left: Math.max(8, left) });
   }
 

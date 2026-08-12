@@ -137,7 +137,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# Wall-clock times (pinned send times, calendar dates, daily charts) are
+# South Africa time; storage stays UTC (USE_TZ).
+TIME_ZONE = 'Africa/Johannesburg'
 
 USE_I18N = True
 

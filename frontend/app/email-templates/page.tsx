@@ -196,6 +196,9 @@ function EmailTemplatesPageInner() {
   const [addParts, setAddParts] = useState<WaitParts>(EMPTY_WAIT);
   const [addTime, setAddTime] = useState("");
   const [addDate, setAddDate] = useState("");
+  // Whether this email waits at all — "no" collapses the wait menu and sends
+  // immediately after the previous email
+  const [addWait, setAddWait] = useState(true);
   const [addTemplateId, setAddTemplateId] = useState("");
   // Explicit "fresh vs template" choice so the two paths are obvious
   const [addFrom, setAddFrom] = useState<"fresh" | "template">("fresh");
@@ -206,6 +209,7 @@ function EmailTemplatesPageInner() {
     setAddParts(EMPTY_WAIT);
     setAddTime("");
     setAddDate("");
+    setAddWait(true);
     setAddTemplateId("");
     setAddFrom("fresh");
     setShowAddTp(true);
@@ -2328,36 +2332,58 @@ function EmailTemplatesPageInner() {
 
             {board.length > 0 && (
               <fieldset className="mb-4 rounded-lg border border-gray-200 p-4">
-                <legend className="px-1 text-[13px] font-medium text-gray-950">How long to wait before it sends</legend>
-                <div className="mb-3 grid grid-cols-5 gap-2">
-                  {([["months", "Months"], ["weeks", "Weeks"], ["days", "Days"], ["hours", "Hours"], ["minutes", "Minutes"]] as const).map(([unit, label]) => (
-                    <div key={unit}>
-                      <label className="mb-1 block text-[13px] font-medium text-gray-950">{label}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={addParts[unit]}
-                        onChange={(e) => setAddParts((p) => ({ ...p, [unit]: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                        className="input-glow w-full rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-center text-[13px] text-gray-950 outline-none"
-                      />
-                    </div>
-                  ))}
+                <legend className="px-1 text-[13px] font-medium text-gray-950">Wait before it sends?</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAddWait(false); setAddParts({ months: 0, weeks: 0, days: 0, hours: 0, minutes: 0 }); setAddTime(""); setAddDate(""); }}
+                    className={`rounded-lg p-3 text-left transition-all ${!addWait ? "bg-[#054B70]/5 ring-2 ring-[#054B70]" : "bg-white ring-1 ring-gray-950/10 hover:ring-gray-950/20"}`}
+                  >
+                    <span className={`block text-[13px] font-semibold ${!addWait ? "text-[#054B70]" : "text-gray-950"}`}>No — send right away</span>
+                    <span className="mt-0.5 block text-[11px] text-gray-500">Goes out immediately after the previous email.</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddWait(true); setAddParts(EMPTY_WAIT); }}
+                    className={`rounded-lg p-3 text-left transition-all ${addWait ? "bg-[#054B70]/5 ring-2 ring-[#054B70]" : "bg-white ring-1 ring-gray-950/10 hover:ring-gray-950/20"}`}
+                  >
+                    <span className={`block text-[13px] font-semibold ${addWait ? "text-[#054B70]" : "text-gray-950"}`}>Yes — wait first</span>
+                    <span className="mt-0.5 block text-[11px] text-gray-500">Set how long, a clock time, or an exact date.</span>
+                  </button>
                 </div>
-                <label className="mb-1 block text-[13px] font-medium text-gray-950">Then send at (optional)</label>
-                <input
-                  type="time"
-                  value={addTime}
-                  onChange={(e) => setAddTime(e.target.value)}
-                  className="input-glow mb-1 w-40 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-950 outline-none"
-                />
-                <p className="text-[12px] text-gray-500">
-                  Combine units freely — e.g. 1 week and 3 days. All zeros = sends immediately. The time pins the clock, e.g. at 9:00 AM.
-                </p>
-                <label className="mb-1 mt-3 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
-                <DatePicker value={addDate} onChange={setAddDate} placeholder="Pick a date…" className="mb-1 w-52" />
-                <p className="text-[12px] text-gray-500">
-                  A date here overrides the wait — the email goes out on that day (at the &quot;Then send at&quot; time if set).
-                </p>
+                {addWait && (
+                  <>
+                    <div className="mb-3 mt-4 grid grid-cols-5 gap-2">
+                      {([["months", "Months"], ["weeks", "Weeks"], ["days", "Days"], ["hours", "Hours"], ["minutes", "Minutes"]] as const).map(([unit, label]) => (
+                        <div key={unit}>
+                          <label className="mb-1 block text-[13px] font-medium text-gray-950">{label}</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={addParts[unit]}
+                            onChange={(e) => setAddParts((p) => ({ ...p, [unit]: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                            className="input-glow w-full rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-center text-[13px] text-gray-950 outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <label className="mb-1 block text-[13px] font-medium text-gray-950">Then send at (optional)</label>
+                    <input
+                      type="time"
+                      value={addTime}
+                      onChange={(e) => setAddTime(e.target.value)}
+                      className="input-glow mb-1 w-40 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-950 outline-none"
+                    />
+                    <p className="text-[12px] text-gray-500">
+                      Combine units freely — e.g. 1 week and 3 days. The time pins the clock, e.g. at 9:00 AM South Africa time (SAST).
+                    </p>
+                    <label className="mb-1 mt-3 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
+                    <DatePicker value={addDate} onChange={setAddDate} placeholder="Pick a date…" className="mb-1 w-52" />
+                    <p className="text-[12px] text-gray-500">
+                      A date here overrides the wait — the email goes out on that day (at the &quot;Then send at&quot; time if set, SAST).
+                    </p>
+                  </>
+                )}
               </fieldset>
             )}
 
@@ -2527,12 +2553,12 @@ function EmailTemplatesPageInner() {
               className="input-glow mb-1 w-40 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] text-gray-900 outline-none"
             />
             <p className="mb-3 text-[11px] text-gray-500">
-              Pins the clock time — e.g. wait 1 week and 3 days, then send at 9:00 AM. Blank = exactly after the wait.
+              Pins the clock time — e.g. wait 1 week and 3 days, then send at 9:00 AM South Africa time (SAST). Blank = exactly after the wait.
             </p>
             <label className="mb-1 block text-[13px] font-medium text-gray-950">Or pick an exact date on the calendar (optional)</label>
             <DatePicker value={waitDate} onChange={setWaitDate} placeholder="Pick a date…" className="mb-1 w-52" />
             <p className="mb-5 text-[11px] text-gray-500">
-              A date here overrides the wait — this email goes out on that day (at the &quot;Then send at&quot; time if set). Use Clear in the calendar to go back to the wait.
+              A date here overrides the wait — this email goes out on that day (at the &quot;Then send at&quot; time if set, SAST). Use Clear in the calendar to go back to the wait.
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setWaitTp(null)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>
