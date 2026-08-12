@@ -276,6 +276,41 @@ function EmailTemplatesPageInner() {
     } catch { notifyBoard("Could not rename"); }
   }
 
+  // Schedule the whole flow from the board (same endpoint the campaigns list uses)
+  const [showScheduleFlow, setShowScheduleFlow] = useState(false);
+  const [schStartAt, setSchStartAt] = useState("");
+  const [schBusy, setSchBusy] = useState(false);
+
+  function openScheduleFlow() {
+    const t = new Date(Date.now() + 86400000);
+    const pad = (x: number) => String(x).padStart(2, "0");
+    setSchStartAt(`${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T09:00`);
+    setShowScheduleFlow(true);
+  }
+
+  async function submitScheduleFlow() {
+    if (!schStartAt) return;
+    setSchBusy(true);
+    try {
+      const res = await fetch(`${API}/schedules/schedule-campaign/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaign_id: campaignId || undefined,
+          when: "later",
+          start_at: new Date(schStartAt).toISOString(),
+        }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setShowScheduleFlow(false);
+        notifyBoard(`On the schedule — ${data.scheduled} email${data.scheduled === 1 ? "" : "s"}${data.skipped ? ` (${data.skipped} empty skipped)` : ""}. See it on the Schedule page.`);
+      } else notifyBoard(data.error || "Could not schedule");
+    } catch { notifyBoard("Could not schedule"); }
+    setSchBusy(false);
+  }
+
   const [waitTp, setWaitTp] = useState<number | null>(null);
   const [waitParts, setWaitParts] = useState<WaitParts>(EMPTY_WAIT);
   const [waitTime, setWaitTime] = useState("");
@@ -1061,6 +1096,17 @@ function EmailTemplatesPageInner() {
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" /></svg>
                     <span className="hidden md:inline">Start campaign flow</span>
                     <span className="md:hidden">Start</span>
+                  </button>
+                )}
+                {board.length > 0 && (
+                  <button
+                    onClick={openScheduleFlow}
+                    title="Pick a launch date & time — touchpoint 1 goes out then, the rest follow their waits"
+                    className="btn-press flex items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-[12px] font-semibold text-gray-700 shadow-sm ring-1 ring-gray-950/10 transition-colors hover:bg-gray-50 sm:px-4"
+                  >
+                    <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+                    <span className="hidden md:inline">Schedule</span>
+                    <span className="md:hidden">Schedule</span>
                   </button>
                 )}
                 <button
@@ -2248,6 +2294,30 @@ function EmailTemplatesPageInner() {
                 {addBusy ? "Adding…" : "Add email"}
               </button>
               <button onClick={() => setShowAddTp(false)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Schedule the flow — pick a launch date & time (Beacon's Schedule a campaign) */}
+      {showScheduleFlow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setShowScheduleFlow(false)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={SPRING} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="mb-1 text-[16px] font-bold text-gray-950">Schedule {campaignName ? `"${campaignName}"` : "this campaign"}</h2>
+            <p className="mb-4 text-[12px] text-gray-500">
+              Touchpoint 1 goes out at the launch time; each next touchpoint follows after its own wait. Watch and cancel it on the Schedule page.
+            </p>
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Launch at</label>
+            <DatePicker withTime value={schStartAt} onChange={setSchStartAt} className="mb-5 w-full" />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowScheduleFlow(false)} className="rounded-lg px-4 py-2.5 text-[12px] font-semibold text-gray-500 hover:bg-gray-100">Cancel</button>
+              <button
+                onClick={submitScheduleFlow}
+                disabled={schBusy || !schStartAt}
+                className="btn-press rounded-lg bg-[#054B70] px-6 py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
+              >
+                {schBusy ? "Working…" : "Put it on the schedule"}
+              </button>
             </div>
           </motion.div>
         </div>

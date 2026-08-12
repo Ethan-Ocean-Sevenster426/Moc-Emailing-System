@@ -3606,7 +3606,7 @@ def schedules_schedule_campaign(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    campaign = Campaign.objects.filter(id=data.get('campaign_id')).first()
+    campaign = Campaign.objects.filter(id=data.get('campaign_id')).first() if data.get('campaign_id') else _resolve_campaign(None)
     if not campaign:
         return JsonResponse({'error': 'Pick a campaign first'}, status=400)
 
@@ -3630,6 +3630,10 @@ def schedules_schedule_campaign(request):
 
     group = ImportGroup.objects.filter(id=data.get('import_group_id')).first() if data.get('import_group_id') else None
     segment = Segment.objects.filter(id=data.get('segment_id')).first() if data.get('segment_id') else None
+    # Callers that don't pick an audience (e.g. the flow board's Schedule
+    # button) fall back to the campaign's default segment.
+    if segment is None and 'segment_id' not in data and campaign.segment_id:
+        segment = campaign.segment
     if segment:
         group = segment.import_group
 
