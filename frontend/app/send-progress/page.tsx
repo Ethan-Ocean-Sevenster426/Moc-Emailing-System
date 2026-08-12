@@ -272,7 +272,7 @@ export default function SendProgressPage() {
             <div className="min-w-0">
               <p className="text-[11px] text-gray-400">Sends <span className="mx-1">›</span> List Campaign Sends</p>
               <h1 className="text-[16px] font-bold text-gray-900">Send Progress</h1>
-              <p className="truncate text-[11px] text-gray-500">Track bulk sends live — nothing is sent for real (routed to the app log).</p>
+              <p className="truncate text-[11px] text-gray-500">Track bulk sends live — every run, its outcome, and what&apos;s coming up.</p>
             </div>
           </div>
           {canEdit && (
@@ -678,7 +678,7 @@ export default function SendProgressPage() {
             </button>
             <h2 className="mb-1 text-[16px] font-bold text-gray-900">Start Bulk Send</h2>
             <p className="mb-4 text-[12px] text-gray-500">
-              Emails are written to the app console (EMAIL_CONSOLE_MODE) — nothing is sent for real yet.
+              Sends the picked touchpoint to its eligible audience — for real. Runs cap at 500 contacts unless you set a limit.
             </p>
 
             <label className="mb-1 block text-[13px] font-medium text-gray-950">Campaign<sup className="text-red-600">*</sup></label>

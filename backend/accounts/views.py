@@ -3415,16 +3415,22 @@ def _run_bulk_send(job_id):
             continue
 
         contact = log.contact
-        contact.refresh_from_db(fields=['status', 'last_touchpoint'])
+        contact.refresh_from_db(fields=['status', 'last_touchpoint', 'last_campaign'])
         if contact.status != 'active':
             log.status = 'skipped'
             log.error = f'Contact status: {contact.status}'
             log.save()
             SendJob.objects.filter(id=job.id).update(skipped_count=F('skipped_count') + 1)
             continue
-        # Sequencing guard: only send TP N to contacts currently at TP N-1
-        # (a previous touchpoint must be done; otherwise skip).
-        if contact.last_touchpoint != tpl.touchpoint_number - 1:
+        # Sequencing guard: only send TP N to contacts currently at TP N-1.
+        # TP1 also starts contacts whose journey belongs to a DIFFERENT
+        # campaign — mirroring _eligible_contacts_for_send.
+        fresh_start = (
+            tpl.touchpoint_number == 1
+            and tpl.campaign_id is not None
+            and contact.last_campaign_id != tpl.campaign_id
+        )
+        if contact.last_touchpoint != tpl.touchpoint_number - 1 and not fresh_start:
             log.status = 'skipped'
             log.error = f'Skipped: at TP{contact.last_touchpoint}, needs TP{tpl.touchpoint_number - 1} first'
             log.save()
