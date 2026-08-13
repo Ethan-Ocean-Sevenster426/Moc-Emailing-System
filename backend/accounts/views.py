@@ -4262,6 +4262,9 @@ def reporting_stats(request):
         try:
             job_qs = job_qs.filter(touchpoint__campaign_id=int(filter_campaign))
             log_qs = log_qs.filter(job__touchpoint__campaign_id=int(filter_campaign))
+            # Contact-level sections (list breakdown, growth, opt rate, groups)
+            # scope to the contacts on this campaign's journey
+            contact_qs = contact_qs.filter(last_campaign_id=int(filter_campaign))
         except (TypeError, ValueError):
             pass
 
@@ -4401,12 +4404,16 @@ def reporting_stats(request):
         sent_at__gte=thirty_days_ago,
         sent_at__isnull=False,
     )
+    # Bucket per-day in Python: MySQL's __date lookup needs the tz tables for
+    # named-zone conversion and silently yields NULL when they're missing.
     daily_stats = defaultdict(lambda: {'sent': 0, 'failed': 0})
-    for log in chart_logs.values('sent_at__date', 'status'):
-        day = str(log['sent_at__date'])
-        if log['status'] == 'sent':
+    for sent_at, status in chart_logs.values_list('sent_at', 'status'):
+        if sent_at is None:
+            continue
+        day = str(timezone.localtime(sent_at).date())
+        if status == 'sent':
             daily_stats[day]['sent'] += 1
-        elif log['status'] == 'failed':
+        elif status == 'failed':
             daily_stats[day]['failed'] += 1
 
     daily_chart = []
@@ -4435,6 +4442,11 @@ def reporting_stats(request):
     seg_qs = Segment.objects.select_related('import_group')
     if filter_group:
         seg_qs = seg_qs.filter(import_group_id=int(filter_group))
+    if filter_campaign:
+        try:
+            seg_qs = seg_qs.filter(campaigns__id=int(filter_campaign)).distinct()
+        except (TypeError, ValueError):
+            pass
     total_positive_replies = seg_qs.aggregate(s=Sum('positive_replies'))['s'] or 0
     segment_stats = []
     for seg in seg_qs.order_by('import_group__name', 'name'):
@@ -4579,7 +4591,7 @@ def reporting_stats(request):
 
     # Campaign scorecard — the full picture per campaign
     scorecard = []
-    for camp in Campaign.objects.select_related('group').order_by('name'):
+    for camp in Campaign.objects.select_related('group', 'segment').order_by('name'):
         camp_jobs = SendJob.objects.filter(touchpoint__campaign=camp, is_test=False)
         c_sent = camp_jobs.aggregate(s=Sum('sent_count'))['s'] or 0
         c_failed = camp_jobs.aggregate(s=Sum('failed_count'))['s'] or 0
@@ -4603,6 +4615,9 @@ def reporting_stats(request):
             'optouts': Contact.objects.filter(status='opted_out', last_campaign=camp).count(),
             'upcoming': ScheduledSend.objects.filter(status='scheduled', touchpoint__campaign=camp).count(),
             'last_at': last_job.created_at.isoformat() if last_job else None,
+            # Replies are tracked on the campaign's default segment
+            'replies': camp.segment.positive_replies if camp.segment else None,
+            'segment_id': camp.segment_id,
         })
 
     # How far people got — funnel for the focus campaign (most active, or ?campaign_id=)
@@ -4621,9 +4636,9 @@ def reporting_stats(request):
             steps.append({'n': n, 'count': cnt, 'pct': int(round(cnt / base * 100)) if base else 0})
         funnel = {'campaign': focus.name, 'auto': not bool(focus_id), 'steps': steps}
 
-    # Audience by group
+    # Audience by group (respects the active filters via contact_qs)
     audience_groups = [
-        {'name': g.name, 'count': Contact.objects.filter(import_group=g).count()}
+        {'name': g.name, 'count': contact_qs.filter(import_group=g).count()}
         for g in ImportGroup.objects.order_by('name')
     ]
     no_group = Contact.objects.filter(import_group__isnull=True).count()

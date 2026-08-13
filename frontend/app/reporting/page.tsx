@@ -26,6 +26,7 @@ interface Stats {
   scorecard: {
     id: number; name: string; automated: boolean; touchpoints: number; sent: number;
     rate: number | null; soft: number; hard: number; optouts: number; upcoming: number; last_at: string | null;
+    replies: number | null; segment_id: number | null;
   }[];
   funnel: { campaign: string; auto: boolean; steps: { n: number; count: number; pct: number }[] } | null;
   audience_groups: { name: string; count: number }[];
@@ -99,9 +100,12 @@ function ReportingPageInner() {
   const [tagFocus, setTagFocus] = useState("");
 
   const [refreshing, setRefreshing] = useState(false);
+  // Inline "Replies" editing on the scorecard (stored on the campaign's default segment)
+  const [editingReplies, setEditingReplies] = useState<number | null>(null);
 
   const fetchStats = useCallback(async (f: { campaign?: string; group?: string; segment?: string; tag?: string }) => {
     setRefreshing(true);
+    const t0 = Date.now();
     try {
       const p = new URLSearchParams();
       if (f.campaign) p.set("campaign_id", f.campaign);
@@ -113,6 +117,9 @@ function ReportingPageInner() {
       const data = await res.json();
       if (data.ok) setStats(data);
     } catch { /* */ }
+    // Keep the overlay visible long enough to register, even on fast responses
+    const remain = 450 - (Date.now() - t0);
+    if (remain > 0) await new Promise((resolve) => setTimeout(resolve, remain));
     setRefreshing(false);
     setLoaded(true);
   }, []);
@@ -123,6 +130,20 @@ function ReportingPageInner() {
     setCampaignFocus(cid);
     fetchStats({ campaign: cid || undefined });
   }, [searchParams, fetchStats]);
+
+  async function saveReplies(segmentId: number, raw: string) {
+    setEditingReplies(null);
+    const n = Math.max(0, parseInt(raw, 10) || 0);
+    try {
+      await fetch(`${API}/segments/update/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: segmentId, positive_replies: n }),
+        credentials: "include",
+      });
+      applyFilters({});
+    } catch { /* */ }
+  }
 
   // One place to change any filter: updates state and refetches with the full set
   function applyFilters(next: { campaign?: string; group?: string; segment?: string; tag?: string }) {
@@ -430,7 +451,7 @@ function ReportingPageInner() {
               </Section>
 
               {/* 5 · Campaign scorecard */}
-              <Section heading="Campaign scorecard" description={<>The full picture per campaign — sends, arrival rate, bounces, opt-outs and what&apos;s coming up.</>}>
+              <Section heading="Campaign scorecard" description={<>The full picture per campaign — sends, arrival rate, bounces, opt-outs, replies you&apos;ve received back (click the count to update it), and what&apos;s coming up.</>}>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[760px] text-left">
                     <thead>
@@ -441,6 +462,7 @@ function ReportingPageInner() {
                         <th className="px-2 py-2 text-right">Soft</th>
                         <th className="px-2 py-2 text-right">Hard</th>
                         <th className="px-2 py-2 text-right">Opt-outs</th>
+                        <th className="px-2 py-2 text-right">Replies</th>
                         <th className="px-2 py-2 text-right">Upcoming</th>
                         <th className="px-2 py-2 text-right">Last send</th>
                       </tr>
@@ -463,6 +485,32 @@ function ReportingPageInner() {
                           <td className="px-2 py-2.5 text-right tabular-nums text-amber-700">{c.soft || "—"}</td>
                           <td className="px-2 py-2.5 text-right tabular-nums text-red-700">{c.hard || "—"}</td>
                           <td className="px-2 py-2.5 text-right tabular-nums">{c.optouts || "—"}</td>
+                          <td className="px-2 py-2.5 text-right">
+                            {c.segment_id === null ? (
+                              <span className="text-gray-400" title="Set a default audience segment on the campaign to track replies">—</span>
+                            ) : editingReplies === c.id ? (
+                              <input
+                                autoFocus
+                                type="number"
+                                min={0}
+                                defaultValue={c.replies ?? 0}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveReplies(c.segment_id!, (e.target as HTMLInputElement).value);
+                                  if (e.key === "Escape") setEditingReplies(null);
+                                }}
+                                onBlur={(e) => saveReplies(c.segment_id!, e.target.value)}
+                                className="w-16 rounded-md bg-gray-50 px-1.5 py-0.5 text-right text-[13px] text-gray-950 outline-none ring-2 ring-[#054B70]"
+                              />
+                            ) : (
+                              <button
+                                onClick={() => setEditingReplies(c.id)}
+                                title="Replies you've received back from this campaign — click to update the count"
+                                className="rounded px-1.5 py-0.5 font-bold tabular-nums text-[#054B70] hover:bg-[#054B70]/5"
+                              >
+                                {c.replies ?? 0} ✎
+                              </button>
+                            )}
+                          </td>
                           <td className="px-2 py-2.5 text-right tabular-nums">{c.upcoming || "—"}</td>
                           <td className="px-2 py-2.5 text-right text-gray-500">{c.last_at ? dateTime(c.last_at) : "—"}</td>
                         </tr>
