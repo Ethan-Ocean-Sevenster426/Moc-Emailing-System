@@ -668,17 +668,21 @@ function ReportingPageInner() {
 
                     {r.bounces.reasons.length > 0 && (
                       <div className="mb-5">
-                        <p className={MINI}>Why they bounced</p>
-                        <div className="space-y-1.5">
+                        <p className={MINI}>Why they bounced{campaignFocus ? " (this campaign)" : ""}</p>
+                        <div className="space-y-2">
                           {r.bounces.reasons.map((x) => (
-                            <div key={`${x.kind}-${x.reason}`} className="flex items-center gap-3 text-[13px]">
-                              <span className="w-56 shrink-0 truncate font-semibold text-gray-950" title={x.reason}>{x.reason}</span>
-                              <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-gray-400/15">
-                                <div className={`h-full rounded-full ${x.kind === "hard" ? "bg-[#ef4444]" : "bg-[#f59e0b]"}`} style={{ width: `${(x.count / maxReason) * 100}%` }} />
-                              </div>
-                              <span className="w-16 shrink-0 text-right font-bold tabular-nums">
-                                {x.count} <span className="font-medium text-gray-400">· {allBounces ? Math.round((x.count / allBounces) * 100) : 0}%</span>
+                            <div key={`${x.kind}-${x.reason}`} className="flex flex-col gap-1 text-[13px] sm:flex-row sm:items-center sm:gap-3">
+                              <span className="min-w-0 font-semibold text-gray-950 sm:w-[45%] sm:shrink-0" style={{ overflowWrap: "anywhere" }}>
+                                {x.reason}
                               </span>
+                              <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-400/15">
+                                  <div className={`h-full rounded-full ${x.kind === "hard" ? "bg-[#ef4444]" : "bg-[#f59e0b]"}`} style={{ width: `${(x.count / maxReason) * 100}%` }} />
+                                </div>
+                                <span className="shrink-0 text-right font-bold tabular-nums">
+                                  {x.count} <span className="font-medium text-gray-400">· {allBounces ? Math.round((x.count / allBounces) * 100) : 0}%</span>
+                                </span>
+                              </div>
                             </div>
                           ))}
                         </div>
