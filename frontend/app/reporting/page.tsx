@@ -729,17 +729,21 @@ function ReportingPageInner() {
                     </div>
 
                     <div className="mb-6">
-                      <p className={MINI}>Why they left — reasons given{campaignFocus ? " (this campaign)" : ""}</p>
-                      <div className="space-y-1.5">
+                      <p className={MINI}>Why they left — the reasons people typed when unsubscribing{campaignFocus ? " (this campaign)" : ""}</p>
+                      <div className="space-y-2">
                         {(r.optouts.by_reason || []).map((x) => {
                           const maxReason = Math.max(1, ...(r.optouts.by_reason || []).map((y) => y.count));
                           return (
                             <div key={x.reason} className="flex items-center gap-3 text-[13px]">
-                              <span className="min-w-0 flex-1 truncate text-gray-950" title={x.reason}>{x.reason}</span>
-                              <div className="hidden h-2 w-40 overflow-hidden rounded-full bg-gray-400/15 sm:block">
+                              <span className="min-w-0 max-w-[55%] shrink-0 truncate font-medium text-gray-950" title={x.reason}>
+                                &ldquo;{x.reason}&rdquo;
+                              </span>
+                              <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-400/15">
                                 <div className="h-full rounded-full bg-amber-500/70" style={{ width: `${(x.count / maxReason) * 100}%` }} />
                               </div>
-                              <span className="shrink-0 font-bold tabular-nums">{x.count}</span>
+                              <span className="shrink-0 font-bold tabular-nums">
+                                {x.count} <span className="font-normal text-gray-500">{x.count === 1 ? "person" : "people"}</span>
+                              </span>
                             </div>
                           );
                         })}
