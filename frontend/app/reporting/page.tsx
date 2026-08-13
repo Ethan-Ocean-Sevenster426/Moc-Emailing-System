@@ -34,6 +34,7 @@ interface Stats {
     total: number;
     with_reason: number;
     by_org: { org: string; count: number }[];
+    by_reason: { reason: string; count: number }[];
     recent: { email: string; contact_name: string; org_name: string; reason: string; at: string }[];
   };
   weekday_split: {
@@ -724,6 +725,24 @@ function ReportingPageInner() {
                       <div className="rounded-lg border border-gray-400/20 px-4 py-3 text-center">
                         <div className="text-[22px] font-extrabold leading-none tabular-nums text-gray-950">{r.optouts.with_reason}</div>
                         <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Gave a reason</div>
+                      </div>
+                    </div>
+
+                    <div className="mb-6">
+                      <p className={MINI}>Why they left — reasons given{campaignFocus ? " (this campaign)" : ""}</p>
+                      <div className="space-y-1.5">
+                        {(r.optouts.by_reason || []).map((x) => {
+                          const maxReason = Math.max(1, ...(r.optouts.by_reason || []).map((y) => y.count));
+                          return (
+                            <div key={x.reason} className="flex items-center gap-3 text-[13px]">
+                              <span className="min-w-0 flex-1 truncate text-gray-950" title={x.reason}>{x.reason}</span>
+                              <div className="hidden h-2 w-40 overflow-hidden rounded-full bg-gray-400/15 sm:block">
+                                <div className="h-full rounded-full bg-amber-500/70" style={{ width: `${(x.count / maxReason) * 100}%` }} />
+                              </div>
+                              <span className="shrink-0 font-bold tabular-nums">{x.count}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 

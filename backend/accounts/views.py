@@ -4657,10 +4657,15 @@ def reporting_stats(request):
     for org in opt_qs.values_list('org_name', flat=True):
         key = org or '(no organisation)'
         opt_by_org[key] = opt_by_org.get(key, 0) + 1
+    opt_by_reason = {}
+    for reason in opt_qs.values_list('opt_out_reason', flat=True):
+        key = (reason or '').strip() or 'No reason given'
+        opt_by_reason[key] = opt_by_reason.get(key, 0) + 1
     optouts = {
         'total': opt_qs.count(),
         'with_reason': opt_qs.exclude(opt_out_reason='').count(),
         'by_org': sorted(({'org': k, 'count': v} for k, v in opt_by_org.items()), key=lambda r: -r['count'])[:8],
+        'by_reason': sorted(({'reason': k, 'count': v} for k, v in opt_by_reason.items()), key=lambda r: -r['count'])[:8],
         'recent': [
             {'email': c.email, 'contact_name': c.contact_name, 'org_name': c.org_name,
              'reason': c.opt_out_reason, 'at': c.updated_at.isoformat()}
