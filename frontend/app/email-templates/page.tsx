@@ -229,11 +229,16 @@ function EmailTemplatesPageInner() {
   const [board, setBoard] = useState<BoardTP[]>([]);
   const [boardLoaded, setBoardLoaded] = useState(false);
 
+  const [optoutReasons, setOptoutReasons] = useState<{ reason: string; count: number }[]>([]);
+
   const fetchBoard = useCallback(async () => {
     try {
       const res = await fetch(`${API}/flow/board/?${cq}`, { credentials: "include" });
       const data = await res.json();
-      if (data.ok) setBoard(data.touchpoints);
+      if (data.ok) {
+        setBoard(data.touchpoints);
+        if (data.optout_reasons) setOptoutReasons(data.optout_reasons);
+      }
     } catch { /* */ }
     setBoardLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1523,7 +1528,9 @@ function EmailTemplatesPageInner() {
                                     <button
                                       type="button"
                                       onClick={openCampaignReport}
-                                      title="How many contacts opted out after this touchpoint — they received (or will receive) this goodbye email. Click to open this campaign's report."
+                                      title={`How many contacts opted out after this touchpoint — they received (or will receive) this goodbye email. Click to open this campaign's report.${
+                                        optoutReasons.length ? ` Top reasons for this campaign: ${optoutReasons.map((x) => `"${x.reason}" (${x.count})`).join(", ")}.` : ""
+                                      }`}
                                       className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 transition-colors hover:bg-amber-500/25 hover:underline"
                                     >
                                       Opted out{bt.optouts > 0 ? ` · ${bt.optouts}` : ""}

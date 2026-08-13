@@ -1762,10 +1762,18 @@ def flow_board(request):
             'optouts': optout_by_tp.get(n, 0),
             'goodbye': gb_dict(goodbyes.get(n)),
         })
+    # Top opt-out reasons for this campaign — shown on the board's opt-out pills
+    reason_counts = {}
+    for reason in Contact.objects.filter(status='opted_out', last_campaign=campaign).values_list('opt_out_reason', flat=True):
+        key = (reason or '').strip() or 'No reason given'
+        reason_counts[key] = reason_counts.get(key, 0) + 1
+    top_reasons = sorted(({'reason': k, 'count': v} for k, v in reason_counts.items()), key=lambda r: -r['count'])[:3]
+
     return JsonResponse({
         'ok': True,
         'touchpoints': board,
         'campaign_goodbye': gb_dict(goodbyes.get(0)),
+        'optout_reasons': top_reasons,
     })
 
 
